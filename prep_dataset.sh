@@ -16,7 +16,7 @@ extract_file() {
     mkdir -p $des_dir/labels
     cp ${ROOT}/VOCdevkit/VOC${year}/JPEGImages/* ${des_dir}/images
     cp ${ROOT}/VOCdevkit/VOC${year}/Annotations/* ${des_dir}/labels
-    #rm -rf ${ROOT}/VOCdevkit   
+    rm -rf ${ROOT}/VOCdevkit   
 }
 
 # 2012 train val dataset
