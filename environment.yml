@@ -1,0 +1,10 @@
+name: ObjectDetectionRL
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - matplotlib
+  - numpy
+  - pip
+  - pip:
+    - opencv-python
