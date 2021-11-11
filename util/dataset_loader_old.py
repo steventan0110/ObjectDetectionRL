@@ -9,7 +9,7 @@ from torchvision import transforms
 import pickle
 
 
-class VOLDataset(Dataset):
+class VOCDataset(Dataset):
 	def __init__(self, input_dir, op, transform=None):
 		self.op = op
 		try:

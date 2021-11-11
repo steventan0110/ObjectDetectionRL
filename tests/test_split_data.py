@@ -69,6 +69,6 @@ def check_class_balance():
 
 
 def run_all():
-    test_process_xml_file()
+    # test_process_xml_file()
     read_json_labels()
     check_class_balance()
