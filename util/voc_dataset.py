@@ -56,7 +56,7 @@ class VOCDataset(Dataset):
 		if self.img_transform:
 			img = self.img_transform(img)
 
-		return img, box, obj_class
+		return img.float(), box, obj_class
 
 	def __len__(self):
 		return len(self.objects)
