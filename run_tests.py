@@ -4,8 +4,8 @@ from tests import test_dataset as td
 
 
 def main():
-    # tsd.run_all()
-    # tt.run_all()
+    tsd.run_all()
+    tt.run_all()
     td.run_all()
 
 

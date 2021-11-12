@@ -1,5 +1,4 @@
 import torchvision
-import numpy as np
 import json
 import torch
 import os
@@ -17,24 +16,26 @@ class VOCDataset(Dataset):
 		# Be careful with transformations that change location of bounding box!
 		self.label_image_transform = label_image_transform
 		self.img_transform = img_transform
-		self.labels, self.objects, self.cls2idx = self.parse_labels(data_folder)
+		self.labels, self.objects = self.parse_labels(data_folder)
 		self.image_folder = os.path.join(data_folder, 'images')
+		self.cls2idx = {'aeroplane': 0, 'bicycle': 1, 'bird': 2,
+						'boat': 3, 'bottle': 4, 'bus': 5,
+						'car': 6, 'cat': 7, 'chair': 8,
+						'cow': 9, 'diningtable': 10, 'dog': 11,
+						'horse': 12, 'motorbike': 13, 'person': 14,
+						'pottedplant': 15, 'sheep': 16, 'sofa': 17,
+						'train': 18, 'tvmonitor': 19}
 
 	def parse_labels(self, data_path):
 		json_path = os.path.join(data_path, 'labels.json')
 		with open(json_path) as f:
 			labels = json.load(f)
 			objects = []
-			obj_class = set()
 			for img_name, img_objs in labels.items():
-				for obj_i, obj in enumerate(img_objs):
+				for obj_i, _obj in enumerate(img_objs):
 					objects.append((img_name, obj_i))
-					obj_class.add(obj['name'])
 
-			obj_class = list(obj_class)
-			obj_indices = np.arange(len(obj_class))
-			cls2idx = dict(zip(obj_class, obj_indices))
-			return labels, objects, cls2idx
+			return labels, objects
 
 	def __getitem__(self, idx):
 		img_name, obj_i = self.objects[idx]
