@@ -29,7 +29,8 @@ class DQN(nn.Module):
 	def __init__(self):
 		super(DQN, self).__init__()
 		self.classifier = nn.Sequential(
-			nn.Linear(in_features=81 + 512*16*16, out_features=1024),
+			# TODO: this dimensino should be auto computed from height and width instead of hardcode
+			nn.Linear(in_features=32849, out_features=1024),
 			nn.ReLU(),
 			nn.Dropout(0.2),
 			nn.Linear(in_features=1024, out_features=1024),

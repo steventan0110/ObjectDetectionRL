@@ -56,8 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--learning-rate', '-lr', default=0.001, type=float)
     parser.add_argument('--save-interval', default=1, type=int)
     parser.add_argument('--beam-size', default=5, type=int)
-    parser.add_argument('--height', default=512, type=int)
-    parser.add_argument('--width', default=512, type=int)
+    parser.add_argument('--height', default=256, type=int)
+    parser.add_argument('--width', default=256, type=int)
     args = parser.parse_args()
     return args
 
