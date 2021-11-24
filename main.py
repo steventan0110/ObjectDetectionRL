@@ -5,6 +5,7 @@ from module.agent import Agent
 from util import transforms as ctransforms
 from util.voc_dataset import VOCDataset
 
+
 def main(args):
     print(args)
     H, W = args.height, args.width

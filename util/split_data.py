@@ -4,6 +4,8 @@ import argparse
 import json
 import os
 
+from util.voc_dataset import VOCDataset
+
 
 OBJECT_LABEL = 'object'
 OBJECT_NAME = 'name'
@@ -86,12 +88,56 @@ def split_data(data_folders, output, train=0.7, val=0.2, seed=0):
     if train_info:
         print('Writing new training split')
         process_split(train_info, output, 'train')
+        labels_folder = os.path.join(output, 'train')
+        sort_labels(labels_folder)
     if val_info:
         print('Writing new validation split')
         process_split(val_info, output, 'val')
+        labels_folder = os.path.join(output, 'val')
+        sort_labels(labels_folder)
     if test_info:
         print('Writing new test split')
         process_split(test_info, output, 'test')
+        labels_folder = os.path.join(output, 'test')
+        sort_labels(labels_folder)
+
+
+def sort_labels(folder):
+    '''
+    Given the labels for this dataset, we need to sort them by class to train one agent at a time.
+    The output data will have the following structure:
+
+    data = {
+        class_name: {
+            filename: [
+                bndbox1,
+                bndbox2, ...
+            ], ...
+        }, ...
+    }
+    '''
+
+    json_path = os.path.join(folder, 'labels.json')
+    with open(json_path) as f:
+        all_labels = json.load(f)
+
+    data = dict()
+    for cls in VOCDataset.get_classes():
+        data[cls] = {}
+
+    for filename, lis_of_objs in all_labels.items():
+        for obj in lis_of_objs:
+            cls, pose, box = obj['name'], obj['pose'], obj['box']
+
+            if filename not in data[cls]:
+                data[cls][filename] = []
+
+            # Not using pose information for this project
+            data[cls][filename].append(box)
+
+    json_path = os.path.join(folder, 'sorted_labels.json')
+    with open(json_path, 'w') as outfile:
+        json.dump(data, outfile)
 
 
 if __name__ == '__main__':

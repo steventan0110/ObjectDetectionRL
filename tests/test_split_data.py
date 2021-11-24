@@ -68,7 +68,14 @@ def check_class_balance():
     plot_hist(test_data, 'Test Data')
 
 
+def test_sort_labels():
+    labels_folder = '/home/jun/Downloads/dataset/test'
+    breakpoint() # Good point to start debugging this method
+    sd.sort_labels(labels_folder)
+
+
 def run_all():
-    # test_process_xml_file()
+    test_process_xml_file()
     read_json_labels()
     check_class_balance()
+    test_sort_labels()

@@ -1,11 +1,6 @@
 import torch.nn as nn
 import torchvision
 
-"""
-Neural Networks we used for extracting image (based on CNN) and predicting action
-These models are used by the agent. 
-The code is inspired by: https://github.com/Mohammed-Deifallah/Active-Object-Localization/blob/main/utils/models.py
-"""
 
 class FeatureExtractor(nn.Module):
 	def __init__(self, network='vgg16'):

@@ -1,5 +1,8 @@
 # ObjectDetectionRL
-Final Project for Reinforcement Learning
+This repo contains the final project for our Reinforcement Learning course. The project contains object detection
+framework using a deep reinforcement learning agent. The core model is a DQN
+whose actions transform a bounding box until it tightly bounds the desired object.
+The code is inspired by this [work](https://github.com/rayansamy/Active-Object-Localization-Deep-Reinforcement-Learning).
 
 ## Setup
 
