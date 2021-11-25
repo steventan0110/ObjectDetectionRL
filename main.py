@@ -14,18 +14,18 @@ def main(args):
     if args.mode == 'train':
         # begin train loop
         train_folder = f'{args.data_dir}/train'
-        train_dataset = VOCDataset(train_folder, label_image_transform=transform)
+        cls = 'aeroplane'
+        train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
         train_dataloader = DataLoader(dataset=train_dataset,
                                       batch_size=args.batch_size,
                                       shuffle=False,
                                       num_workers=4)
         valid_folder = f'{args.data_dir}/val'
-        valid_dataset = VOCDataset(valid_folder, label_image_transform=transform)
+        valid_dataset = VOCDataset(valid_folder, cls, label_image_transform=transform)
         valid_dataloader = DataLoader(dataset=valid_dataset,
                                       batch_size=args.batch_size,
                                       shuffle=False,
                                       num_workers=4)
-
         # agent is the trainer that control training for 1 epoch
         agent = Agent(train_dataloader, valid_dataloader, **vars(args))
 
@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--image-extractor', default="vgg16")
     parser.add_argument('--rl-algo', default="DQN")
     parser.add_argument('--max-epoch', default=100, type=int)
-    parser.add_argument('--batch-size', default=8, type=int)
+    parser.add_argument('--batch-size', default=1, type=int) # hard code 1 for now
     parser.add_argument('--learning-rate', '-lr', default=0.001, type=float)
     parser.add_argument('--save-interval', default=1, type=int)
     parser.add_argument('--beam-size', default=5, type=int)

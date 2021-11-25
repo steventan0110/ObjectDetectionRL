@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 
-from util.voc_dataset import VOCDataset
+from voc_dataset import VOCDataset
 
 
 OBJECT_LABEL = 'object'
