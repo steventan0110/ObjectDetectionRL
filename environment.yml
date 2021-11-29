@@ -2,14 +2,15 @@ name: ObjectDetectionRL
 channels:
   - anaconda
   - conda-forge
-  # - nvidia # TODO undo for computers with GPU
+  - nvidia
   - pytorch
 dependencies:
-  # - nvidia::cudatoolkit=11.1 # TODO undo for computers with GPU
+  - nvidia::cudatoolkit=11.1
   - pytorch::pytorch
   - matplotlib
   - torchvision
   - numpy
+  - tqdm
   - pip
   - pip:
     - opencv-python

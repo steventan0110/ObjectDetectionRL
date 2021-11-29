@@ -3,7 +3,7 @@ import torchvision
 
 
 class FeatureExtractor(nn.Module):
-	def __init__(self, network='vgg16'):
+	def __init__(self, network='vgg16', freeze=True):
 		super(FeatureExtractor, self).__init__()
 		if network == 'vgg16':
 			model = torchvision.models.vgg16(pretrained=True)
@@ -14,6 +14,12 @@ class FeatureExtractor(nn.Module):
 		model.eval()  # to not do dropout
 		self.features = list(model.children())[0]
 		self.classifier = nn.Sequential(*list(model.classifier.children())[:-2])
+
+		if freeze:
+			for param in self.features.parameters():
+				param.requires_grad = False
+			for param in self.classifier.parameters():
+				param.requires_grad = False
 
 	def forward(self, x):
 		x = self.features(x)

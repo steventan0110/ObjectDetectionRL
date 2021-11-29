@@ -2,7 +2,7 @@ import torch
 
 from util.voc_dataset import VOCDataset
 from util import transforms as ctransforms
-from tests.test_transforms import plot_box
+from util.common import plot_box
 
 
 def test_voc_dataset(plot=True):

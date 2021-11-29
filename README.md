@@ -27,3 +27,8 @@ in the util folder. Run the script as follows
 
 `bash prep_dataset.sh <FOLDER_TO_STORE_DATA>`
 
+## Training
+
+To train the agents, use the following command:
+
+`python main.py --mode train --data-dir <DATA_FOLDER> --save-dir <SAVE_FOLDER>`

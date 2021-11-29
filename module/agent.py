@@ -1,56 +1,73 @@
 import os
 import torch
+
 from module.models import DQN, FeatureExtractor
 from module.memory import ReplayMemory
 from torch.autograd import Variable
+from tqdm import tqdm
 
 
 class Agent:
 
-    def __init__(self, train_dataloader, valid_dataloader,
-                 alpha=0.2, threshold=0.6, eta=3,
-                 episodes=100, max_steps_per_episode=20,
-                 **kwargs):
-        self.num_args = 9
-        self.args = kwargs
-        self.gamma = 0.7
-        self.lr = kwargs['learning_rate']
+    def __init__(self, train_dataloader, valid_dataloader, alpha=0.2, threshold=0.5,
+                 eta=3, epochs=15, max_steps_per_episode=20, **kwargs):
+
+        # Defining constants
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
-        self.device = torch.device('cpu' if self.args['cpu'] else 'cuda')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.num_actions = 9
         self.height = kwargs['height']
         self.width = kwargs['width']
-        self.episodes = episodes
+        self.epochs = epochs
         self.max_steps_per_episode = max_steps_per_episode
-        self.extractor = FeatureExtractor(kwargs['image_extractor']).to(self.device)
-        self.extractor.eval()  # do not update the pretrained CNN
-        print(self.extractor)
+        self.save_interval = kwargs['save_interval']
+        self.save_dir = kwargs['save_dir']
+
+        # Defining hyperparameters
+        self.gamma = 0.7
         self.alpha = alpha
         self.threshold = threshold
         self.eta = eta
         self.epsilon = 0.2
-        self.batch_size = kwargs['batch_size']
+        self.batch_size = kwargs['batch_size'] # Used when sampling from replay memory
+        self.lr = kwargs['learning_rate']
+        self.target_update = kwargs['target_update']
+
+        # Initializing models
+        self.extractor = FeatureExtractor(kwargs['image_extractor'], freeze=True).to(self.device)
+        self.extractor.eval()  # do not update the pretrained CNN
+
         rl_algo = kwargs['rl_algo']
         if rl_algo == 'DQN':
             self.policy_net = DQN().to(self.device)
             self.target_net = DQN().to(self.device)  # DQN use two policy network
+        elif rl_algo == 'DoubleDQN':
+            raise ValueError('Not yet implemented')
+        else:
+            raise ValueError('Please select a reinforcement learning model to use')
+
+        if kwargs['load_dir'] is not None:
+            self.load_checkpoint(kwargs['load_dir'])
+        else:
             self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.target_net.eval()
-            self.target_update = 20  # TODO: hardcode for now
-        print(self.policy_net)
-        self.memory = ReplayMemory(1000) # capacity = 1000
+
+        self.target_net.eval()
+        for param in self.target_net.parameters():
+            param.requires_grad = False
+
+        # Initializing remaining deep learning objects
+        self.memory = ReplayMemory(10000)
         self.criterion = torch.nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.args['learning_rate'])
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            self.optimizer,
-            max_lr=self.args['learning_rate'],
-            epochs=self.args['max_epoch'],
-            steps_per_epoch=len(self.train_dataloader))
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.lr)
 
     def get_state(self, image):
-        image_feature = self.extractor(image)  # (bz, 512, 16, 16) if image is not resized
-        image_feature = image_feature.reshape(self.batch_size, -1)
-        history = self.actions_history.reshape(self.batch_size, -1).type(torch.FloatTensor).to(self.device)
+        if len(image.shape) == 3:
+            # Need to add batch dimension
+            image = image.unsqueeze(0)
+        image_feature = self.extractor(image)
+        image_feature = image_feature.reshape(1, -1)
+        history = self.actions_history.reshape(1, -1).type(torch.FloatTensor).to(self.device)
         state = torch.cat((image_feature, history), 1)
         return state
 
@@ -64,7 +81,7 @@ class Agent:
             # TODO
             # This should be random positive action rather than just random action
             # There are no situations where a random action that reduces reward is optimal
-            return torch.randint(0, 9, (self.batch_size,))
+            return torch.randint(0, self.num_actions, (1,))
 
     def update_action_history(self, action):
         # Update action history
@@ -74,7 +91,7 @@ class Agent:
 
         # self.action_history has shape (number of actions, size of action space)
         self.actions_history = torch.roll(self.actions_history, 1, 0)
-        action_one_hot = torch.zeros(self.num_args)
+        action_one_hot = torch.zeros(self.num_actions, device=self.device)
         action_one_hot[action] = 1
         self.actions_history[0] = action_one_hot
 
@@ -123,32 +140,18 @@ class Agent:
         new_box = [x_min, x_max, y_min, y_max]
         return new_box, False
 
-    def update_observed_region_old(self, image, box):
-        import torchvision.transforms as T
-        x_min, x_max, y_min, y_max = int(box[0]), int(box[1]), int(box[2]), int(box[3])
-        # resize back to the same height and width
-        resize = T.Compose([
-            T.Resize(self.width),
-            T.CenterCrop(self.width)
-        ])
-        # TODO: is this proper? especially if the action is fatter/thinner, the image would be stretched
-        # sometimes get division by 0 error
-        image = resize(image[:, x_min:x_max, y_min:y_max])
-        return image
-
     def update_observed_region(self, image, box):
         from util.transforms import resize
         x_min, x_max, y_min, y_max = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         img_roi = image[:, x_min:x_max, y_min:y_max]
         transform = resize(self.height, self.width)
-        image, _box = transform(img_roi, box)
+        image, _box = transform(img_roi, [box])
         return image
 
     def find_closest_box(self, box, gt_boxes):
         max_area = -float('inf')
         best_box = None
         for gt_box in gt_boxes:
-            gt_box = gt_box.numpy()
             area = self.compute_IOU(box, gt_box)
             if area > max_area:
                 max_area = area
@@ -172,8 +175,8 @@ class Agent:
         IOU_prev, _best_box = self.find_closest_box(prev_box, ground_truth_boxes)
         IOU_cur, _best_box = self.find_closest_box(cur_box, ground_truth_boxes)
         if IOU_cur > IOU_prev:
-            return 1
-        return 0
+            return torch.tensor(1, device=self.device)
+        return torch.tensor(0, device=self.device)
 
     def train(self):
         xmin = 0.0
@@ -181,15 +184,19 @@ class Agent:
         ymin = 0.0
         ymax = self.height
 
-        for i_episode in range(self.episodes):
-            for idx, (image, boxes) in enumerate(self.train_dataloader):
-                # BATCHSIZE=1 is fixed, ignore this index
+        self.policy_net.train()
+
+        for epoch_i in range(1, self.epochs + 1):
+            print(f'EPOCH {epoch_i}')
+            training_loss = []
+            for image, boxes in tqdm(self.train_dataloader):
+                assert image.shape[0] == 1 and boxes.shape[0] == 1  # Batch size must be 1
                 image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
 
                 # Action history is initialized to all ones when episode first starts
                 # This allows us to have a fix number of states when passing the features to the Q function
                 # Real actions will be represented with a one hot vector
-                # TODO Can also try using all zeros.
+                # Can also try using all zeros.
                 self.actions_history = torch.ones((9, 9), device=self.device)
 
                 original_coordinates = [xmin, xmax, ymin, ymax]
@@ -200,20 +207,22 @@ class Agent:
 
                 t = 0
                 while not done and t < self.max_steps_per_episode:
-                    action = self.get_action(prev_state).item()
+                    action = self.get_action(prev_state)
                     self.update_action_history(action)
                     cur_box, done = self.update_box(action, prev_box)
                     if done:
                         # Termination reward is different than reward from other actions
                         IOU, _best_box = self.find_closest_box(prev_box, boxes)
                         reward = self.eta if IOU >= self.threshold else -1 * self.eta
+                        reward = torch.tensor(reward, device=self.device)
                         self.memory.push(prev_state, action, None, reward)
                     else:
                         try:
                             cur_image = self.update_observed_region(prev_image, cur_box)
-                        except ValueError:
+                        except ZeroDivisionError:
                             # Due to stochastic nature of bounding box values from model,
-                            # there are cases when exceptions occur
+                            # there are cases when exceptions occur.
+                            # One example is when image gets transformed to H = 0 or W = 0
                             break
 
                         next_state = self.get_state(cur_image)
@@ -225,38 +234,46 @@ class Agent:
                         prev_image = cur_image
                         prev_state = next_state
 
-                    self.train_policy_net(4)
+                    loss = self.train_policy_net()
+                    if loss is not None: training_loss.append(loss)
                     t += 1
 
-            if i_episode % self.target_update == 0:
-                self.target_net.load_state_dict(self.policy_net.state_dict())
+            avg_batch_loss = sum(training_loss) / len(training_loss)
+            print(f'Average batch loss: {avg_batch_loss}')
 
-    def train_policy_net(self, BATCH_SIZE=None):
+            if epoch_i % self.target_update == 0:
+                self.target_net.load_state_dict(self.policy_net.state_dict())
+                self.target_net.eval()
+                for param in self.target_net.parameters():
+                    param.requires_grad = False
+
+            if epoch_i % self.save_interval == 0:
+                self.save_checkpoint(epoch_i, self.save_dir)
+
+    def train_policy_net(self):
         # Optimize the model using backprop
 
-        if BATCH_SIZE is None:
-            BATCH_SIZE = self.batch_size
-        if len(self.memory) < BATCH_SIZE:
-            return
+        if len(self.memory) < self.batch_size:
+            return None
 
-        samples_tuple = self.memory.sample(BATCH_SIZE)
-        rewards = torch.zeros((BATCH_SIZE, 1), device=self.device)
-        actions = torch.zeros((BATCH_SIZE, 1), dtype=torch.int64, device=self.device)
-        final_state_mask = torch.zeros(BATCH_SIZE)
+        samples_tuple = self.memory.sample(self.batch_size)
+        rewards = torch.zeros((self.batch_size, 1), device=self.device)
+        actions = torch.zeros((self.batch_size, 1), dtype=torch.int64, device=self.device)
+        final_state_mask = torch.zeros(self.batch_size, device=self.device)
         cur_state_list, next_state_list = [], []
-        for i in range(BATCH_SIZE):
+        for i in range(self.batch_size):
             cur_state, action, next_state, reward = samples_tuple[i]
-            cur_state_list.append(cur_state)
+            cur_state_list.append(cur_state[0])
             rewards[i] = reward
             actions[i] = action
             if next_state is not None:
-                next_state_list.append(next_state)
+                next_state_list.append(next_state[0])
             else:
                 final_state_mask[i] = 1
-                empty_state = torch.zeros((1, cur_state.size(1)))
+                empty_state = torch.zeros(cur_state.size(1), device=self.device)
                 next_state_list.append(empty_state)
-        cur_state_tensor = Variable(torch.stack(cur_state_list, dim=0).squeeze().to(self.device))
-        next_state_tensor = Variable(torch.stack(next_state_list, dim=0).squeeze().to(self.device))
+        cur_state_tensor = Variable(torch.stack(cur_state_list, dim=0).to(self.device))
+        next_state_tensor = Variable(torch.stack(next_state_list, dim=0).to(self.device))
 
         # Calculating predicted q values
         Q = self.policy_net(cur_state_tensor).gather(1, actions)
@@ -265,6 +282,7 @@ class Agent:
         next_state_action_value = self.target_net(next_state_tensor)
         max_next_state_action_value, _ = torch.max(next_state_action_value, dim=1)
         masked_next_value = max_next_state_action_value * (1 - final_state_mask)
+        masked_next_value = masked_next_value.unsqueeze(1) # Has shape batch size x 1
         expected_Q = rewards + self.gamma * masked_next_value
 
         loss = self.criterion(Q, expected_Q)
@@ -272,17 +290,17 @@ class Agent:
         loss.backward()
         self.optimizer.step()
 
-    def save_checkpoint(self, epoch, loss, val_loss, dir):
-        save_path = os.path.join(dir, 'checkpoint' + str(epoch) + '.pt')
+        return loss.item()
+
+    def save_checkpoint(self, epoch, dir):
+        save_path = os.path.join(dir, 'checkpoint_' + str(epoch) + '.pt')
         torch.save({
-            'epoch': epoch,
-            'loss': loss,
-            'val_loss': val_loss,
             'policy_network': self.policy_net.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
         }, save_path)
 
     def load_checkpoint(self, dir):
+        # TODO given dir, need to find checkpoint of latest epoch
         checkpoint = torch.load(dir, map_location=self.device)
         self.policy_net.load_state_dict(checkpoint['policy_network'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

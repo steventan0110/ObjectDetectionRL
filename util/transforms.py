@@ -14,7 +14,11 @@ class resize:
         We will also recalculate the bounding box label
         '''
 
-        boxes = torch.clone(boxes) # Avoid changing the input boxes tensor
+        if torch.is_tensor(boxes):
+            boxes = torch.clone(boxes) # Avoid changing the input boxes tensor
+        else:
+            boxes = torch.tensor(boxes)
+
         img_c, img_h, img_w = img.shape
         ar = img_h / img_w
 
