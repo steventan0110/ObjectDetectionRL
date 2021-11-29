@@ -34,13 +34,13 @@ tar -xvf ${ROOT}/VOCtest_06-Nov-2007.tar -C ${ROOT}
 extract_file 2007 ${ROOT}/dataset/test/2007
 rm ${ROOT}/VOCtest_06-Nov-2007.tar
 
-python ${ROOT}/util/split_data.py \
+python split_data.py \
  -d ${ROOT}/dataset/train-dev/2007/ ${ROOT}/dataset/train-dev/2012/ \
  -o ${ROOT}/dataset/ \
  -t 0.8 \
  -v 0.2
 
-python ${ROOT}/util/split_data.py \
+python split_data.py \
  -d ${ROOT}/dataset/test/2007 \
  -o ${ROOT}/dataset \
  -t 0.0 \
