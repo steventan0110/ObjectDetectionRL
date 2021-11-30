@@ -9,10 +9,11 @@ from tqdm import tqdm
 
 class Agent:
 
-    def __init__(self, train_dataloader, valid_dataloader, alpha=0.2, threshold=0.5,
+    def __init__(self, cls, train_dataloader, valid_dataloader, alpha=0.2, threshold=0.5,
                  eta=3, epochs=15, max_steps_per_episode=20, **kwargs):
 
         # Defining constants
+        self.cls = cls
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -185,14 +186,12 @@ class Agent:
         ymax = self.height
 
         self.policy_net.train()
-
         for epoch_i in range(1, self.epochs + 1):
-            print(f'EPOCH {epoch_i}')
+            print(f'EPOCH {epoch_i} for class {self.cls}')
             training_loss = []
             for image, boxes in tqdm(self.train_dataloader):
                 assert image.shape[0] == 1 and boxes.shape[0] == 1  # Batch size must be 1
                 image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
-
                 # Action history is initialized to all ones when episode first starts
                 # This allows us to have a fix number of states when passing the features to the Q function
                 # Real actions will be represented with a one hot vector
@@ -217,13 +216,16 @@ class Agent:
                         reward = torch.tensor(reward, device=self.device)
                         self.memory.push(prev_state, action, None, reward)
                     else:
-                        try:
-                            cur_image = self.update_observed_region(prev_image, cur_box)
-                        except ZeroDivisionError:
-                            # Due to stochastic nature of bounding box values from model,
-                            # there are cases when exceptions occur.
-                            # One example is when image gets transformed to H = 0 or W = 0
+                        x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
+                        if x_min >= x_max or y_min >= y_max:
                             break
+                        # try:
+                        cur_image = self.update_observed_region(prev_image, cur_box)
+                        # except ZeroDivisionError:
+                        #     # Due to stochastic nature of bounding box values from model,
+                        #     # there are cases when exceptions occur.
+                        #     # One example is when image gets transformed to H = 0 or W = 0
+                        #     break
 
                         next_state = self.get_state(cur_image)
                         reward = self.compute_reward(prev_box, cur_box, boxes)
@@ -249,6 +251,11 @@ class Agent:
 
             if epoch_i % self.save_interval == 0:
                 self.save_checkpoint(epoch_i, self.save_dir)
+
+            # validate
+            precision = self.validate()
+            print(f'precision: {precision}')
+            self.policy_net.train()
 
     def train_policy_net(self):
         # Optimize the model using backprop
@@ -292,8 +299,76 @@ class Agent:
 
         return loss.item()
 
+
+    def _validate_find_box(self, image):
+        xmin = 0.0
+        xmax = self.width
+        ymin = 0.0
+        ymax = self.height
+        assert image.shape[0] == 1
+        image = image.squeeze(0).to(self.device)
+        self.actions_history = torch.ones((9, 9), device=self.device)
+        original_coordinates = [xmin, xmax, ymin, ymax]
+        prev_state = self.get_state(image)  # bz x (81 + image feature size)
+        prev_box = original_coordinates
+        prev_image = image
+        done = False
+        t = 0
+        while not done and t < self.max_steps_per_episode:
+            action = self.get_action(prev_state)
+            self.update_action_history(action)
+            cur_box, done = self.update_box(action, prev_box)
+            if done:
+                # IOU, _best_box = self.find_closest_box(prev_box, boxes)
+                # directly return the current box found
+                return prev_box
+            else:
+                x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
+                if x_min >= x_max or y_min >= y_max:
+                    break
+                # try:
+                cur_image = self.update_observed_region(prev_image, cur_box)
+                next_state = self.get_state(cur_image)
+
+                # Tracked object update for next loop
+                prev_box = cur_box
+                prev_image = cur_image
+                prev_state = next_state
+            t += 1
+        return cur_box # non terminating case, should be a bad box
+
+
+    def _eval(self, hyp, tgt):
+        assert len(hyp) == len(tgt)
+        sample_size = len(hyp)
+        tp = 0
+        fp = 0
+        for i in range(sample_size):
+            predicted_box = hyp[i]
+            gt_boxes = tgt[i].squeeze(0)
+            iou, _ = self.find_closest_box(predicted_box, gt_boxes)
+            if iou >= self.threshold:
+                tp += 1.
+            else:
+                fp += 1.
+        return tp / sample_size
+
+
+    def validate(self):
+        self.policy_net.eval()
+        hyp = []
+        tgt = []
+        # compute the precision and recall on validation set
+        for image, boxes in tqdm(self.valid_dataloader):
+            box = self._validate_find_box(image)
+            hyp.append(box)
+            tgt.append(boxes)
+        precision = self._eval(hyp, tgt)
+        return precision
+
+
     def save_checkpoint(self, epoch, dir):
-        save_path = os.path.join(dir, 'checkpoint_' + str(epoch) + '.pt')
+        save_path = os.path.join(dir, 'checkpoint_' + self.cls + '_' + str(epoch) + '.pt')
         torch.save({
             'policy_network': self.policy_net.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
