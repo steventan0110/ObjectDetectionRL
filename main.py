@@ -52,7 +52,8 @@ def parse_args():
     parser.add_argument('--rl_algo', default='DQN', help='The reinforcement learning algorithm to use')
     parser.add_argument('--batch_size', default=100, type=int)
     parser.add_argument('--learning_rate', '-lr', default=1e-6, type=float, help='Learning rate')
-    parser.add_argument('--target_update', '-tu', default=20, type=int, help='Number of epochs before updating target network')
+    parser.add_argument('--target_update', '-tu', default=1, type=int, help='Number of epochs before updating target '
+                                                                            'network')
     parser.add_argument('--height', default=256, type=int, help='Height to resize image to')
     parser.add_argument('--width', default=256, type=int, help='Width to resize image to')
     args = parser.parse_args()

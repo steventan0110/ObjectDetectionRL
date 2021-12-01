@@ -5,6 +5,7 @@ from module.models import DQN, FeatureExtractor
 from module.memory import ReplayMemory
 from torch.autograd import Variable
 from tqdm import tqdm
+import random
 
 
 class Agent:
@@ -26,11 +27,11 @@ class Agent:
         self.save_dir = kwargs['save_dir']
 
         # Defining hyperparameters
-        self.gamma = 0.7
+        self.gamma = 0.9
         self.alpha = alpha
         self.threshold = threshold
         self.eta = eta
-        self.epsilon = 0.2
+        self.epsilon = 1
         self.batch_size = kwargs['batch_size'] # Used when sampling from replay memory
         self.lr = kwargs['learning_rate']
         self.target_update = kwargs['target_update']
@@ -72,17 +73,41 @@ class Agent:
         state = torch.cat((image_feature, history), 1)
         return state
 
-    def get_action(self, state):
-        p = torch.rand(1).item()
-        if p > self.epsilon:
+    def get_action_eval(self, state):
+        with torch.no_grad():
             pred = self.policy_net(state)
             _, best_action = torch.max(pred, 1)
             return best_action
+
+    def get_action(self, state, gt_boxes, actions):
+        p = torch.rand(1).item()
+        if p > self.epsilon:
+            # exploitation
+            pred = self.policy_net(state)
+            _, best_action = torch.max(pred, 1)
+            return best_action.item()
         else:
-            # TODO
-            # This should be random positive action rather than just random action
-            # There are no situations where a random action that reduces reward is optimal
-            return torch.randint(0, self.num_actions, (1,))
+            # guided exploration instead of randomly choosing action in epsilon-greedy policy
+            prev_box = self.update_box(actions)
+            good_action = []
+            bad_action = []
+            for candidate_action in range(9):
+                temp = actions.copy()
+                temp.append(candidate_action)
+                cur_box = self.update_box(temp)
+                if candidate_action == 8: # terminate
+                    IOU, _best_box = self.find_closest_box(cur_box, gt_boxes)
+                    reward = self.eta if IOU >= self.threshold else -1 * self.eta
+                else:
+                    reward = self.compute_reward(prev_box, cur_box, gt_boxes)
+                if reward >= 0:
+                    good_action.append(candidate_action)
+                else:
+                    bad_action.append(candidate_action)
+            if len(good_action) == 0:
+                return random.choice(bad_action)
+            return random.choice(good_action)
+
 
     def update_action_history(self, action):
         # Update action history
@@ -96,42 +121,41 @@ class Agent:
         action_one_hot[action] = 1
         self.actions_history[0] = action_one_hot
 
-    def update_box(self, action, prev_box):
-        x_min, x_max, y_min, y_max = prev_box[0], prev_box[1], prev_box[2], prev_box[3]
+    def update_box(self, actions):
+        x_min, x_max, y_min, y_max = 0, self.width, 0, self.height
         alpha_h = self.alpha * (y_max - y_min)
         alpha_w = self.alpha * (x_max - x_min)
 
-        if action == 0:  # left
-            x_min -= alpha_w
-            x_max -= alpha_w
-        elif action == 1:  # right
-            x_min += alpha_w
-            x_max += alpha_w
-        elif action == 2:  # up
-            y_min -= alpha_h
-            y_max -= alpha_h
-        elif action == 3:  # down
-            y_min += alpha_h
-            y_max += alpha_h
-        elif action == 4:  # bigger
-            x_min -= alpha_w
-            x_max += alpha_w
-            y_min -= alpha_h
-            y_max += alpha_h
-        elif action == 5:  # smaller
-            x_min += alpha_w
-            x_max -= alpha_w
-            y_min += alpha_h
-            y_max -= alpha_h
-        elif action == 6:  # shorter
-            y_min += alpha_h
-            y_max -= alpha_h
-        elif action == 7:  # narrower
-            x_min += alpha_w
-            x_max -= alpha_w
-        elif action == 8:
-            # New no box coordinates and done is True
-            return None, True
+        for action in actions:
+            if action == 0:  # left
+                x_min -= alpha_w
+                x_max -= alpha_w
+            elif action == 1:  # right
+                x_min += alpha_w
+                x_max += alpha_w
+            elif action == 2:  # up
+                y_min -= alpha_h
+                y_max -= alpha_h
+            elif action == 3:  # down
+                y_min += alpha_h
+                y_max += alpha_h
+            elif action == 4:  # bigger
+                x_min -= alpha_w
+                x_max += alpha_w
+                y_min -= alpha_h
+                y_max += alpha_h
+            elif action == 5:  # smaller
+                x_min += alpha_w
+                x_max -= alpha_w
+                y_min += alpha_h
+                y_max -= alpha_h
+            elif action == 6:  # shorter
+                y_min += alpha_h
+                y_max -= alpha_h
+            elif action == 7:  # narrower
+                x_min += alpha_w
+                x_max -= alpha_w
+
 
         x_min = min(max(x_min, 0), self.width)
         x_max = min(max(x_max, 0), self.width)
@@ -139,7 +163,7 @@ class Agent:
         y_max = min(max(y_max, 0), self.height)
 
         new_box = [x_min, x_max, y_min, y_max]
-        return new_box, False
+        return new_box
 
     def update_observed_region(self, image, box):
         from util.transforms import resize
@@ -203,15 +227,20 @@ class Agent:
                 prev_box = original_coordinates
                 prev_image = image
                 done = False
+                all_actions = [] # track all previous action to update box
 
                 t = 0
                 while not done and t < self.max_steps_per_episode:
-                    action = self.get_action(prev_state)
+                    action = self.get_action(prev_state, boxes, all_actions)
+                    done = action == 8
+                    all_actions.append(action)
+
                     self.update_action_history(action)
-                    cur_box, done = self.update_box(action, prev_box)
+                    cur_box = self.update_box(all_actions)
+
                     if done:
                         # Termination reward is different than reward from other actions
-                        IOU, _best_box = self.find_closest_box(prev_box, boxes)
+                        IOU, _best_box = self.find_closest_box(cur_box, boxes)
                         reward = self.eta if IOU >= self.threshold else -1 * self.eta
                         reward = torch.tensor(reward, device=self.device)
                         self.memory.push(prev_state, action, None, reward)
@@ -251,6 +280,9 @@ class Agent:
 
             if epoch_i % self.save_interval == 0:
                 self.save_checkpoint(epoch_i, self.save_dir)
+
+            if epoch_i <= 5:
+                self.epsilon -= 0.9/5 # anneal epsilon from 1 to 0.1 following the paper
 
             # validate
             precision = self.validate()
@@ -300,7 +332,7 @@ class Agent:
         return loss.item()
 
 
-    def _validate_find_box(self, image):
+    def _validate_find_box(self, image, boxes):
         xmin = 0.0
         xmax = self.width
         ymin = 0.0
@@ -310,18 +342,21 @@ class Agent:
         self.actions_history = torch.ones((9, 9), device=self.device)
         original_coordinates = [xmin, xmax, ymin, ymax]
         prev_state = self.get_state(image)  # bz x (81 + image feature size)
-        prev_box = original_coordinates
         prev_image = image
         done = False
+
+        all_actions = []  # track all previous action to update box
+
         t = 0
         while not done and t < self.max_steps_per_episode:
-            action = self.get_action(prev_state)
+            action = self.get_action_eval(prev_state)
+            done = action == 8
+            all_actions.append(action)
+
             self.update_action_history(action)
-            cur_box, done = self.update_box(action, prev_box)
+            cur_box = self.update_box(all_actions)
             if done:
-                # IOU, _best_box = self.find_closest_box(prev_box, boxes)
-                # directly return the current box found
-                return prev_box
+                return cur_box
             else:
                 x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
                 if x_min >= x_max or y_min >= y_max:
@@ -331,7 +366,6 @@ class Agent:
                 next_state = self.get_state(cur_image)
 
                 # Tracked object update for next loop
-                prev_box = cur_box
                 prev_image = cur_image
                 prev_state = next_state
             t += 1
@@ -360,7 +394,7 @@ class Agent:
         tgt = []
         # compute the precision and recall on validation set
         for image, boxes in tqdm(self.valid_dataloader):
-            box = self._validate_find_box(image)
+            box = self._validate_find_box(image, boxes)
             hyp.append(box)
             tgt.append(boxes)
         precision = self._eval(hyp, tgt)
