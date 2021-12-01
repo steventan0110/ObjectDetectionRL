@@ -216,6 +216,7 @@ class Agent:
             for image, boxes in tqdm(self.train_dataloader):
                 assert image.shape[0] == 1 and boxes.shape[0] == 1  # Batch size must be 1
                 image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
+                original_image = image.clone()
                 # Action history is initialized to all ones when episode first starts
                 # This allows us to have a fix number of states when passing the features to the Q function
                 # Real actions will be represented with a one hot vector
@@ -225,7 +226,6 @@ class Agent:
                 original_coordinates = [xmin, xmax, ymin, ymax]
                 prev_state = self.get_state(image)  # bz x (81 + image feature size)
                 prev_box = original_coordinates
-                prev_image = image
                 done = False
                 all_actions = [] # track all previous action to update box
 
@@ -248,13 +248,8 @@ class Agent:
                         x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
                         if x_min >= x_max or y_min >= y_max:
                             break
-                        # try:
-                        cur_image = self.update_observed_region(prev_image, cur_box)
-                        # except ZeroDivisionError:
-                        #     # Due to stochastic nature of bounding box values from model,
-                        #     # there are cases when exceptions occur.
-                        #     # One example is when image gets transformed to H = 0 or W = 0
-                        #     break
+
+                        cur_image = self.update_observed_region(original_image, cur_box)
 
                         next_state = self.get_state(cur_image)
                         reward = self.compute_reward(prev_box, cur_box, boxes)
@@ -262,7 +257,6 @@ class Agent:
 
                         # Tracked object update for next loop
                         prev_box = cur_box
-                        prev_image = cur_image
                         prev_state = next_state
 
                     loss = self.train_policy_net()
@@ -341,10 +335,9 @@ class Agent:
         image = image.squeeze(0).to(self.device)
         self.actions_history = torch.ones((9, 9), device=self.device)
         original_coordinates = [xmin, xmax, ymin, ymax]
+        original_image = image.clone()
         prev_state = self.get_state(image)  # bz x (81 + image feature size)
-        prev_image = image
         done = False
-
         all_actions = []  # track all previous action to update box
 
         t = 0
@@ -362,11 +355,8 @@ class Agent:
                 if x_min >= x_max or y_min >= y_max:
                     break
                 # try:
-                cur_image = self.update_observed_region(prev_image, cur_box)
+                cur_image = self.update_observed_region(original_image, cur_box)
                 next_state = self.get_state(cur_image)
-
-                # Tracked object update for next loop
-                prev_image = cur_image
                 prev_state = next_state
             t += 1
         return cur_box # non terminating case, should be a bad box
