@@ -210,6 +210,7 @@ class Agent:
         ymax = self.height
 
         self.policy_net.train()
+        best_precision = -float('inf')
         for epoch_i in range(1, self.epochs + 1):
             print(f'EPOCH {epoch_i} for class {self.cls}')
             training_loss = []
@@ -280,6 +281,9 @@ class Agent:
 
             # validate
             precision = self.validate()
+            if precision[-1] > best_precision:
+                self.save_checkpoint("best", self.save_dir)
+
             print(f'precision: {precision}')
             self.policy_net.train()
 
@@ -402,6 +406,8 @@ class Agent:
 
     def save_checkpoint(self, epoch, dir):
         save_path = os.path.join(dir, 'checkpoint_' + self.cls + '_' + str(epoch) + '.pt')
+        if os.path.exists(save_path):
+            os.remove(save_path)
         torch.save({
             'policy_network': self.policy_net.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
