@@ -216,17 +216,17 @@ class Agent:
             for image, boxes in tqdm(self.train_dataloader):
                 assert image.shape[0] == 1 and boxes.shape[0] == 1  # Batch size must be 1
                 image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
-                original_image = image.clone()
                 # Action history is initialized to all ones when episode first starts
                 # This allows us to have a fix number of states when passing the features to the Q function
                 # Real actions will be represented with a one hot vector
                 # Can also try using all zeros.
                 self.actions_history = torch.ones((9, 9), device=self.device)
 
-                original_coordinates = [xmin, xmax, ymin, ymax]
+                original_image = image.clone()
                 prev_state = self.get_state(image)  # bz x (81 + image feature size)
-                prev_box = original_coordinates
+                prev_box = [xmin, xmax, ymin, ymax]
                 done = False
+                # TODO is there a need to track all actions?
                 all_actions = [] # track all previous action to update box
 
                 t = 0
