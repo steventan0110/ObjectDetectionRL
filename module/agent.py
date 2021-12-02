@@ -377,7 +377,7 @@ class Agent:
             gt_boxes = tgt[i].squeeze(0)
             iou, _ = self.find_closest_box(predicted_box, gt_boxes)
             for threshold in thresholds:
-                if iou >= self.threshold:
+                if iou >= threshold:
                     out[threshold]['tp'] += 1.0
                 else:
                     out[threshold]['fp'] += 1.0
