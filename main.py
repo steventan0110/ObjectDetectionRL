@@ -23,6 +23,7 @@ def main(args):
                    'pottedplant': 15, 'sheep': 16, 'sofa': 17,
                    'train': 18, 'tvmonitor': 19}
         for cls in cls2idx.keys():
+        # for cls in ['person']:
             train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
             train_dataloader = DataLoader(dataset=train_dataset,
                                           batch_size=1,
