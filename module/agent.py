@@ -365,17 +365,26 @@ class Agent:
     def _eval(self, hyp, tgt):
         assert len(hyp) == len(tgt)
         sample_size = len(hyp)
-        tp = 0
-        fp = 0
+        thresholds = [0.1, 0.2, 0.3, 0.4, 0.5]
+        out = dict()
+        for threshold in thresholds:
+            out[threshold] = {
+                'tp': 0,
+                'fp': 0
+            }
         for i in range(sample_size):
             predicted_box = hyp[i]
             gt_boxes = tgt[i].squeeze(0)
             iou, _ = self.find_closest_box(predicted_box, gt_boxes)
-            if iou >= self.threshold:
-                tp += 1.
-            else:
-                fp += 1.
-        return tp / sample_size
+            for threshold in thresholds:
+                if iou >= self.threshold:
+                    out[threshold]['tp'] += 1.0
+                else:
+                    out[threshold]['fp'] += 1.0
+        prec = []
+        for threshold in thresholds:
+            prec.append(out[threshold]['tp']/sample_size)
+        return prec
 
 
     def validate(self):
