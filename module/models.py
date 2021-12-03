@@ -16,7 +16,7 @@ class FeatureExtractor(nn.Module):
 		self.classifier = nn.Sequential(*list(model.classifier.children())[:-2])
 		num_cls = 20
 		# replicate VGG structure
-		self.classifier = nn.Sequential(
+		self.new_classifier = nn.Sequential(
 			nn.Dropout(),
 			nn.Linear(512*8*8, 4096),
 			nn.ReLU(),
@@ -25,12 +25,13 @@ class FeatureExtractor(nn.Module):
 			nn.ReLU(),
 			nn.Linear(4096, num_cls)
 		)
-		for param in self.features.parameters():
-			param.requires_grad = False
+
 
 		if freeze:
 			self.finetune = False
 			model.eval()  # to not do dropout
+			for param in self.features.parameters():
+				param.requires_grad = False
 			for param in self.classifier.parameters():
 				param.requires_grad = False
 		else:
@@ -46,7 +47,7 @@ class FeatureExtractor(nn.Module):
 			x = self.features(x)
 			bz = x.size(0)
 			x = x.view(bz, -1)
-			return self.classifier(x)
+			return self.new_classifier(x)
 
 class DQN(nn.Module):
 	def __init__(self):

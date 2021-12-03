@@ -4,35 +4,28 @@ import argparse
 from pathlib import Path
 from torch.utils.data import DataLoader
 from module.agent import Agent
+from module.pretrain import Trainer
 from module.models import FeatureExtractor
 from util import transforms as ctransforms
-from util.voc_dataset import VOCDataset
+from util.voc_dataset import VOCDataset, VOCClassDataset
 from tqdm import tqdm
 
 def main(args):
     H, W = args.height, args.width
     transform = [ctransforms.resize(H, W)]
+    train_folder = os.path.join(args.data_dir, 'train')
+    valid_folder = os.path.join(args.data_dir, 'val')
 
     if args.mode == "pretrain":
-        train_folder = os.path.join(args.data_dir, 'train')
-        valid_folder = os.path.join(args.data_dir, 'val')
-        classes = VOCDataset.get_classes()
-        vgg = FeatureExtractor(freeze=False)
-        for cls in classes:
-            train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
-            train_dataloader = DataLoader(dataset=train_dataset,
-                                          batch_size=1,
-                                          shuffle=True,
-                                          num_workers=4)
-            for image, boxes in tqdm(train_dataloader):
-                out = vgg(image)
-                print(out.shape)
-                raise Exception
-            print(cls)
+        img_transform = ctransforms.resize_img(H, W)
+        train_dataset = VOCClassDataset(train_folder, img_transform=img_transform)
+        train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        valid_dataset = VOCClassDataset(valid_folder, img_transform=img_transform)
+        valid_dataloader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
+        trainer = Trainer(train_dataloader, valid_dataloader, **vars(args))
+        trainer.train()
 
     if args.mode == 'train':
-        train_folder = os.path.join(args.data_dir, 'train')
-        valid_folder = os.path.join(args.data_dir, 'val')
         # classes = VOCDataset.get_classes()
         # for cls in classes:
         for cls in ['aeroplane']:
@@ -78,7 +71,7 @@ def parse_args():
     parser.add_argument('--load_path', default=None, type=Path, help='Folder where checkpoint params are located')
     parser.add_argument('--image_extractor', default='vgg16', help='Feature extractor to use')
     parser.add_argument('--rl_algo', default='DQN', help='The reinforcement learning algorithm to use')
-    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--learning_rate', '-lr', default=1e-6, type=float, help='Learning rate')
     parser.add_argument('--target_update', '-tu', default=1, type=int, help='Number of epochs before updating target '
                                                                             'network')

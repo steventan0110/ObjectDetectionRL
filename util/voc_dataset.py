@@ -136,8 +136,7 @@ class VOCClassDataset(Dataset):
 			img = self.img_transform(img)
 
 		img = img.to(torch.float32)
-		cls = torch.tensor(cls, dtype=torch.int32)
-
+		cls = torch.tensor(cls).type(torch.LongTensor)
 		return img, cls
 
 	def __len__(self):
