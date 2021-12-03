@@ -11,6 +11,7 @@ dependencies:
   - torchvision
   - numpy
   - tqdm
+  - imageio
   - pip
   - pip:
     - opencv-python

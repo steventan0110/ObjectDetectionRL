@@ -1,11 +1,13 @@
 import os
 import torch
+import random
+import imageio
 
 from module.models import DQN, FeatureExtractor
 from module.memory import ReplayMemory
 from torch.autograd import Variable
+from util.common import draw_box
 from tqdm import tqdm
-import random
 
 
 class Agent:
@@ -49,11 +51,6 @@ class Agent:
         else:
             raise ValueError('Please select a reinforcement learning model to use')
 
-        if kwargs['load_dir'] is not None:
-            self.load_checkpoint(kwargs['load_dir'])
-        else:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-
         self.target_net.eval()
         for param in self.target_net.parameters():
             param.requires_grad = False
@@ -62,6 +59,11 @@ class Agent:
         self.memory = ReplayMemory(10000)
         self.criterion = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.lr)
+
+        if kwargs['load_path'] is not None:
+            # Must load parameters after optimizer has been created
+            self.load_checkpoint(kwargs['load_path'])
+        self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def get_state(self, image):
         if len(image.shape) == 3:
@@ -156,18 +158,17 @@ class Agent:
                 x_min += alpha_w
                 x_max -= alpha_w
 
-
         x_min = min(max(x_min, 0), self.width)
         x_max = min(max(x_max, 0), self.width)
         y_min = min(max(y_min, 0), self.height)
         y_max = min(max(y_max, 0), self.height)
 
-        new_box = [x_min, x_max, y_min, y_max]
+        new_box = [x_min, y_min, x_max, y_max]
         return new_box
 
     def update_observed_region(self, image, box):
         from util.transforms import resize
-        x_min, x_max, y_min, y_max = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+        x_min, y_min, x_max, y_max = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         img_roi = image[:, x_min:x_max, y_min:y_max]
         transform = resize(self.height, self.width)
         image, _box = transform(img_roi, [box])
@@ -184,8 +185,8 @@ class Agent:
         return max_area, best_box
 
     def compute_IOU(self, box, ground_truth):
-        x_min, x_max, y_min, y_max = box[0], box[1], box[2], box[3]
-        x_min_gold, x_max_gold, y_min_gold, y_max_gold = ground_truth[0], ground_truth[1], \
+        x_min, y_min, x_max, y_max = box[0], box[1], box[2], box[3]
+        x_min_gold, y_min_gold, x_max_gold, y_max_gold = ground_truth[0], ground_truth[1], \
                                                          ground_truth[2], ground_truth[3]
 
         box_area = (x_max - x_min) * (y_max - y_min)
@@ -225,9 +226,8 @@ class Agent:
 
                 original_image = image.clone()
                 prev_state = self.get_state(image)  # bz x (81 + image feature size)
-                prev_box = [xmin, xmax, ymin, ymax]
+                prev_box = [xmin, ymin, xmax, ymax]
                 done = False
-                # TODO is there a need to track all actions?
                 all_actions = [] # track all previous action to update box
 
                 t = 0
@@ -246,7 +246,7 @@ class Agent:
                         reward = torch.tensor(reward, device=self.device)
                         self.memory.push(prev_state, action, None, reward)
                     else:
-                        x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
+                        x_min, y_min, x_max, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
                         if x_min >= x_max or y_min >= y_max:
                             break
 
@@ -329,16 +329,10 @@ class Agent:
 
         return loss.item()
 
-
-    def _validate_find_box(self, image, boxes):
-        xmin = 0.0
-        xmax = self.width
-        ymin = 0.0
-        ymax = self.height
+    def _validate_find_box(self, image, get_actions=False):
         assert image.shape[0] == 1
         image = image.squeeze(0).to(self.device)
         self.actions_history = torch.ones((9, 9), device=self.device)
-        original_coordinates = [xmin, xmax, ymin, ymax]
         original_image = image.clone()
         prev_state = self.get_state(image)  # bz x (81 + image feature size)
         done = False
@@ -352,10 +346,8 @@ class Agent:
 
             self.update_action_history(action)
             cur_box = self.update_box(all_actions)
-            if done:
-                return cur_box
-            else:
-                x_min, x_max, y_min, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
+            if not done:
+                x_min, y_min, x_max, y_max = int(cur_box[0]), int(cur_box[1]), int(cur_box[2]), int(cur_box[3])
                 if x_min >= x_max or y_min >= y_max:
                     break
                 # try:
@@ -363,8 +355,11 @@ class Agent:
                 next_state = self.get_state(cur_image)
                 prev_state = next_state
             t += 1
-        return cur_box # non terminating case, should be a bad box
 
+        if get_actions:
+            return cur_box, all_actions
+        else:
+            return cur_box
 
     def _eval(self, hyp, tgt):
         assert len(hyp) == len(tgt)
@@ -390,19 +385,65 @@ class Agent:
             prec.append(out[threshold]['tp']/sample_size)
         return prec
 
-
     def validate(self):
         self.policy_net.eval()
         hyp = []
         tgt = []
         # compute the precision and recall on validation set
         for image, boxes in tqdm(self.valid_dataloader):
-            box = self._validate_find_box(image, boxes)
-            hyp.append(box)
-            tgt.append(boxes)
+            with torch.no_grad():
+                box = self._validate_find_box(image)
+                hyp.append(box)
+                tgt.append(boxes)
         precision = self._eval(hyp, tgt)
         return precision
 
+    def _save_gif(self, output_path, box_history, gt, image):
+        GT_COLOR = (0, 128, 0) # Green
+        PRED_COLOR = (255, 0, 0) # Blue
+        gif_images = []
+        for box in box_history:
+            drawn_img = draw_box(image, box, PRED_COLOR)
+            drawn_img = draw_box(drawn_img, gt, GT_COLOR)
+            gif_images.append(drawn_img)
+        imageio.mimsave(output_path, gif_images)
+
+    def _get_box_history(self, actions):
+        box_history = []
+        num_actions = len(actions)
+        for t in range(1, num_actions):
+            actions_t = actions[:t]
+            box_t = self.update_box(actions_t)
+            box_history.append(box_t)
+        return box_history
+
+    def visualize(self, output_dir=None, num_images=20):
+        if output_dir is None:
+            output_dir = os.path.join(self.save_dir, 'visualizations')
+        if not os.path.isdir(output_dir):
+            os.makedirs(output_dir)
+
+        self.policy_net.eval()
+        results = []
+        for i, (image, boxes) in enumerate(self.valid_dataloader):
+            if num_images >= 0 and i >= num_images:
+                break
+            else:
+                with torch.no_grad():
+                    pred_box, actions = self._validate_find_box(image, get_actions=True)
+
+                    image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
+                    IOU, closest_gt = self.find_closest_box(pred_box, boxes)
+                    entry = (self._get_box_history(actions), closest_gt, image, IOU)
+                    results.append(entry)
+
+        # Sorting by IOU
+        results.sort(key=lambda entry: entry[-1], reverse=True)
+        print('Saving gifs starting from highest to lowest IOU')
+        for rank, (box_history, gt, image, IOU) in enumerate(results):
+            print(f'IOU for image ranked {rank} is {IOU}')
+            output_path = os.path.join(output_dir, f'image_{rank}.gif')
+            self._save_gif(output_path, box_history, gt, image)
 
     def save_checkpoint(self, epoch, dir):
         save_path = os.path.join(dir, 'checkpoint_' + self.cls + '_' + str(epoch) + '.pt')
@@ -413,8 +454,8 @@ class Agent:
             'optimizer_state_dict': self.optimizer.state_dict(),
         }, save_path)
 
-    def load_checkpoint(self, dir):
-        # TODO given dir, need to find checkpoint of latest epoch
-        checkpoint = torch.load(dir, map_location=self.device)
+    def load_checkpoint(self, param_path):
+        checkpoint = torch.load(param_path, map_location=self.device)
         self.policy_net.load_state_dict(checkpoint['policy_network'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+

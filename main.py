@@ -15,15 +15,9 @@ def main(args):
     if args.mode == 'train':
         train_folder = os.path.join(args.data_dir, 'train')
         valid_folder = os.path.join(args.data_dir, 'val')
-        cls2idx = {'aeroplane': 0, 'bicycle': 1, 'bird': 2,
-                   'boat': 3, 'bottle': 4, 'bus': 5,
-                   'car': 6, 'cat': 7, 'chair': 8,
-                   'cow': 9, 'diningtable': 10, 'dog': 11,
-                   'horse': 12, 'motorbike': 13, 'person': 14,
-                   'pottedplant': 15, 'sheep': 16, 'sofa': 17,
-                   'train': 18, 'tvmonitor': 19}
-        for cls in cls2idx.keys():
-        # for cls in ['person']:
+        # classes = VOCDataset.get_classes()
+        # for cls in classes:
+        for cls in ['areoplane']:
             train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
             train_dataloader = DataLoader(dataset=train_dataset,
                                           batch_size=1,
@@ -40,15 +34,30 @@ def main(args):
             print(f"Start Training for class {cls}")
             agent.train()
             print()
+    elif args.mode == 'test':
+        if args.load_path is None:
+            raise ValueError('Need to provide parameters for test mode')
+
+        cls = 'aeroplane' # TODO do not hardcode in the future
+        valid_folder = os.path.join(args.data_dir, 'val')
+        valid_dataset = VOCDataset(valid_folder, cls, label_image_transform=transform)
+        valid_dataloader = DataLoader(dataset=valid_dataset,
+                                      batch_size=1,
+                                      shuffle=False,
+                                      num_workers=4)
+        agent = Agent(cls, None, valid_dataloader, **vars(args))
+        print(f"Start Training for class {cls}")
+        agent.visualize()
+
 
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--mode', '-m', choices={'train', 'test', 'interactive'}, help='execution mode')
     parser.add_argument('--data_dir', type=Path, help='Folder where train, test, and dev data is located')
-    parser.add_argument('--save_dir', type=Path, help='Folder to save training data')
+    parser.add_argument('--save_dir', type=Path, help='Folder to save training and visualization data')
     parser.add_argument('--save_interval', default=5, type=int, help='Intervals to save data')
-    parser.add_argument('--load_dir', default=None, type=Path, help='Folder where checkpoint params are located')
+    parser.add_argument('--load_path', default=None, type=Path, help='Folder where checkpoint params are located')
     parser.add_argument('--image_extractor', default='vgg16', help='Feature extractor to use')
     parser.add_argument('--rl_algo', default='DQN', help='The reinforcement learning algorithm to use')
     parser.add_argument('--batch_size', default=100, type=int)
