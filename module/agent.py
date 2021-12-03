@@ -442,7 +442,7 @@ class Agent:
         print('Saving gifs starting from highest to lowest IOU')
         for rank, (box_history, gt, image, IOU) in enumerate(results):
             print(f'IOU for image ranked {rank} is {IOU}')
-            output_path = os.path.join(output_dir, f'image_{rank}.gif')
+            output_path = os.path.join(output_dir, f'image_rank_{rank}.gif')
             self._save_gif(output_path, box_history, gt, image)
 
     def save_checkpoint(self, epoch, dir):

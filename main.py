@@ -17,7 +17,7 @@ def main(args):
         valid_folder = os.path.join(args.data_dir, 'val')
         # classes = VOCDataset.get_classes()
         # for cls in classes:
-        for cls in ['areoplane']:
+        for cls in ['aeroplane']:
             train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
             train_dataloader = DataLoader(dataset=train_dataset,
                                           batch_size=1,
