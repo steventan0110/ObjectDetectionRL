@@ -11,20 +11,42 @@ class FeatureExtractor(nn.Module):
 			model = torchvision.models.resnet50(pretrained=True)
 		else:
 			model = torchvision.models.alexnet(pretrained=True)
-		model.eval()  # to not do dropout
+
 		self.features = list(model.children())[0]
 		self.classifier = nn.Sequential(*list(model.classifier.children())[:-2])
+		num_cls = 20
+		# replicate VGG structure
+		self.classifier = nn.Sequential(
+			nn.Dropout(),
+			nn.Linear(512*8*8, 4096),
+			nn.ReLU(),
+			nn.Dropout(),
+			nn.Linear(4096, 4096),
+			nn.ReLU(),
+			nn.Linear(4096, num_cls)
+		)
+		for param in self.features.parameters():
+			param.requires_grad = False
 
 		if freeze:
-			for param in self.features.parameters():
-				param.requires_grad = False
+			self.finetune = False
+			model.eval()  # to not do dropout
 			for param in self.classifier.parameters():
 				param.requires_grad = False
+		else:
+			self.finetune = True
+			model.train()
+
 
 	def forward(self, x):
-		x = self.features(x)
-		return x
-
+		if not self.finetune:
+			x = self.features(x)
+			return x
+		else:
+			x = self.features(x)
+			bz = x.size(0)
+			x = x.view(bz, -1)
+			return self.classifier(x)
 
 class DQN(nn.Module):
 	def __init__(self):

@@ -4,13 +4,31 @@ import argparse
 from pathlib import Path
 from torch.utils.data import DataLoader
 from module.agent import Agent
+from module.models import FeatureExtractor
 from util import transforms as ctransforms
 from util.voc_dataset import VOCDataset
-
+from tqdm import tqdm
 
 def main(args):
     H, W = args.height, args.width
     transform = [ctransforms.resize(H, W)]
+
+    if args.mode == "pretrain":
+        train_folder = os.path.join(args.data_dir, 'train')
+        valid_folder = os.path.join(args.data_dir, 'val')
+        classes = VOCDataset.get_classes()
+        vgg = FeatureExtractor(freeze=False)
+        for cls in classes:
+            train_dataset = VOCDataset(train_folder, cls, label_image_transform=transform)
+            train_dataloader = DataLoader(dataset=train_dataset,
+                                          batch_size=1,
+                                          shuffle=True,
+                                          num_workers=4)
+            for image, boxes in tqdm(train_dataloader):
+                out = vgg(image)
+                print(out.shape)
+                raise Exception
+            print(cls)
 
     if args.mode == 'train':
         train_folder = os.path.join(args.data_dir, 'train')
@@ -53,7 +71,7 @@ def main(args):
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--mode', '-m', choices={'train', 'test', 'interactive'}, help='execution mode')
+    parser.add_argument('--mode', '-m', choices={'train', 'test', 'interactive', 'pretrain'}, help='execution mode')
     parser.add_argument('--data_dir', type=Path, help='Folder where train, test, and dev data is located')
     parser.add_argument('--save_dir', type=Path, help='Folder to save training and visualization data')
     parser.add_argument('--save_interval', default=5, type=int, help='Intervals to save data')
