@@ -64,3 +64,12 @@ class resize:
             box[3] = self.H * (box[3] / img_h)
 
         return img, boxes
+
+
+class resize_img:
+    def __init__(self, H, W):
+        self.T = resize(H, W)
+
+    def __call__(self, img):
+        img, _ = self.T(img, [[0, 0, 0, 0]])
+        return img
