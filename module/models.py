@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torchvision
 
@@ -66,9 +67,38 @@ class DQN(nn.Module):
 	def forward(self, x):
 		return self.classifier(x)
 
-# TODO:
-class DoubleDQN(nn.Module):
-	pass
 
-class DuelingNetwork(nn.Module):
-	pass
+class DuelingDQN(nn.Module):
+	def __init__(self, num_actions=9):
+		super(DuelingDQN, self).__init__()
+		self.num_actions = num_actions
+
+		# Must output advantage for each action given input state
+		self.advantage_func = nn.Sequential(
+			nn.Linear(in_features=512*8*8+81, out_features=1024),
+			nn.ReLU(),
+			nn.Dropout(0.2),
+			nn.Linear(in_features=1024, out_features=256),
+			nn.ReLU(),
+			nn.Dropout(0.2),
+			nn.Linear(in_features=256, out_features=num_actions)
+		)
+
+		# Must output scalar to represent the value of the input state
+		self.value_func = nn.Sequential(
+			nn.Linear(in_features=512*8*8+81, out_features=1024),
+			nn.ReLU(),
+			nn.Dropout(0.2),
+			nn.Linear(in_features=1024, out_features=256),
+			nn.ReLU(),
+			nn.Dropout(0.2),
+			nn.Linear(in_features=256, out_features=1)
+		)
+
+	def forward(self, x):
+		adv = self.advantage_func(x) # batch_size x num_actions
+		adv_avg = torch.mean(adv, dim=1, keepdim=True) # batch_size x 1
+		val = self.value_func(x) # batch_size x 1
+		q = val + adv - adv_avg
+		return q
+
