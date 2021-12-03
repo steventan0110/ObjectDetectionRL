@@ -7,11 +7,12 @@ from tqdm import tqdm
 
 
 class Trainer:
-    def __init__(self, train_dataloader, valid_dataloader, epochs=20, **kwargs):
+    def __init__(self, train_dataloader, valid_dataloader, test_dataloader, epochs=20, **kwargs):
 
         # Defining constants
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
+        self.test_dataloader = test_dataloader
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.height = kwargs['height']
         self.width = kwargs['width']
@@ -38,6 +39,25 @@ class Trainer:
         plt.plot(val_acc, label='val accuracy')
         plt.legend()
         plt.savefig(f'{self.save_dir}/loss-curve.png')
+
+    def plot_curve(self):
+        x = [_ for _ in range(20)]
+        train_loss = [1.953, 1.3882, 1.1474, 1.03599, 0.90604, 0.6764, 0.613966, 0.5789, 0.5383, 0.51047, 0.4753,
+                      0.47789, 0.464825,0.460503, 0.467663, 0.444439, 0.45601359, 0.459355, 0.4650490, 0.4553926]
+        val_loss = [1.53853261, 1.26586,1.1259732,1.072498, 1.043067812919,0.92924988,0.93180048,0.8840809,0.9327643,
+                    0.91877877, 0.9169676, 0.916742, 0.90229851, 0.89235621, 0.91823112, 0.920982301, 0.9059537053,
+                    0.9048750,0.93360078,0.917428672]
+        val_acc = [0.5493562, 0.6299977, 0.6634289, 0.6873729, 0.691664784,  0.728258414, 0.72215947,  0.741811610,
+                   0.729387847,0.733905,0.73910097,0.7377456,0.73797153,0.74700700,0.7370679,0.74045629,0.7433928,
+                   0.74361870,0.73616444,0.738875084]
+        plt.figure()
+        plt.plot(x, train_loss, label='train loss')
+        # plt.plot(x, val_loss, label='val loss')
+        plt.legend()
+        plt.show()
+        # plt.savefig(f'{self.save_dir}/loss-curve.png')
+
+        # plt.plot(val_acc, label='val accuracy')
 
 
     def train(self):
@@ -93,6 +113,27 @@ class Trainer:
 
         return sum(valid_batch_loss) / len(self.valid_dataloader), correct/total
 
+    def test(self):
+        import numpy as np
+        from util.voc_dataset import VOCDataset
+        total = 0
+        correct = 0
+        self.extractor.eval()
+        for image, label in tqdm(self.test_dataloader):
+            image, label = image.to(self.device), label.squeeze(1).to(self.device)
+            out = self.extractor(image)
+            predicted_label = torch.argmax(out, dim=1)
+            total += label.size(0)
+            correct += (predicted_label.float() == label.float()).sum().item()
+            predicted_label = VOCDataset.get_idx2cls()[predicted_label[0].item()]
+            print(predicted_label)
+            temp = image[0, :, :, :].cpu().permute(1,2,0)
+            temp = np.ascontiguousarray(temp, dtype=np.uint8)
+            plt.figure()
+            plt.imshow(temp)
+            plt.show()
+
+        print("Test accuracy: ", correct / total)
 
     def save_checkpoint(self, epoch, dir):
         save_path = os.path.join(dir, 'checkpoint_vgg_' + str(epoch) + '.pt')

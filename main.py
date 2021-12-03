@@ -15,15 +15,21 @@ def main(args):
     transform = [ctransforms.resize(H, W)]
     train_folder = os.path.join(args.data_dir, 'train')
     valid_folder = os.path.join(args.data_dir, 'val')
-
+    test_folder = os.path.join(args.data_dir, 'test')
     if args.mode == "pretrain":
         img_transform = ctransforms.resize_img(H, W)
         train_dataset = VOCClassDataset(train_folder, img_transform=img_transform)
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
         valid_dataset = VOCClassDataset(valid_folder, img_transform=img_transform)
         valid_dataloader = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
-        trainer = Trainer(train_dataloader, valid_dataloader, **vars(args))
-        trainer.train()
+        test_dataset = VOCClassDataset(test_folder, img_transform=img_transform)
+        test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
+        trainer = Trainer(train_dataloader, valid_dataloader, test_dataloader, **vars(args))
+        if args.finetune:
+            trainer.train()
+        else:
+            trainer.load_checkpoint(args.load_path_cnn)
+            trainer.test()
 
     if args.mode == 'train':
         # classes = VOCDataset.get_classes()
@@ -69,6 +75,8 @@ def parse_args():
     parser.add_argument('--save_dir', type=Path, help='Folder to save training and visualization data')
     parser.add_argument('--save_interval', default=5, type=int, help='Intervals to save data')
     parser.add_argument('--load_path', default=None, type=Path, help='Folder where checkpoint params are located')
+    parser.add_argument('--finetune', action='store_true')
+    parser.add_argument('--load-path-cnn', default=None, type=Path, help='image extractor checkpoint')
     parser.add_argument('--image_extractor', default='vgg16', help='Feature extractor to use')
     parser.add_argument('--rl_algo', default='DQN', help='The reinforcement learning algorithm to use')
     parser.add_argument('--batch_size', default=16, type=int)
