@@ -43,7 +43,7 @@ def main(args):
                                       batch_size=1,
                                       shuffle=False,
                                       num_workers=4)
-        agent = Agent(cls, train_dataloader, valid_dataloader, **vars(args))
+        agent = Agent(train_dataloader, valid_dataloader, **vars(args))
         print(f"Start Training for class {cls}")
         agent.train()
     elif args.mode == 'test':
@@ -57,7 +57,7 @@ def main(args):
                                       batch_size=1,
                                       shuffle=False,
                                       num_workers=4)
-        agent = Agent(args.cls, None, valid_dataloader, **vars(args))
+        agent = Agent(None, valid_dataloader, **vars(args))
         print(f"Started testing class {args.cls}")
         agent.visualize()
 
@@ -72,6 +72,8 @@ def parse_args():
                         help='Folder where train, test, and dev data is located')
     parser.add_argument('--save_dir', type=Path,
                         help='Folder to save training and visualization data')
+    parser.add_argument('--stats_dir', type=Path, default=None,
+                        help='Folder to save stats about training and validation')
     parser.add_argument('--save_interval', default=5, type=int,
                         help='Intervals to save data')
     parser.add_argument('--load_path', default=None, type=Path,

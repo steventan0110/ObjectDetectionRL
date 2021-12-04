@@ -12,11 +12,11 @@ from tqdm import tqdm
 
 class Agent:
 
-    def __init__(self, cls, train_dataloader, valid_dataloader, alpha=0.2, threshold=0.5,
+    def __init__(self, train_dataloader, valid_dataloader, alpha=0.2, threshold=0.5,
                  eta=3, epochs=15, max_steps_per_episode=20, **kwargs):
 
         # Defining constants
-        self.cls = cls
+        self.cls = kwargs['cls']
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -64,7 +64,9 @@ class Agent:
         self.memory = ReplayMemory(10000)
         self.criterion = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.lr)
-
+        self.stats_dir = kwargs['stats_dir']
+        if self.stats_dir is None:
+            print('Not saving stats of training!')
         if kwargs['load_path'] is not None:
             # Must load parameters after optimizer has been created
             self.load_checkpoint(kwargs['load_path'])
@@ -212,6 +214,8 @@ class Agent:
         return torch.tensor(0, device=self.device)
 
     def train(self):
+        from collections import defaultdict
+        import json
         xmin = 0.0
         xmax = self.width
         ymin = 0.0
@@ -219,9 +223,12 @@ class Agent:
 
         self.policy_net.train()
         best_precision = -float('inf')
+        stats = defaultdict(list)
+
         for epoch_i in range(1, self.epochs + 1):
             print(f'EPOCH {epoch_i} for class {self.cls}')
             training_loss = []
+
             for image, boxes in tqdm(self.train_dataloader):
                 assert image.shape[0] == 1 and boxes.shape[0] == 1  # Batch size must be 1
                 image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
@@ -268,10 +275,13 @@ class Agent:
                         prev_state = next_state
 
                     loss = self.train_policy_net()
-                    if loss is not None: training_loss.append(loss)
+                    if loss is not None:
+                        training_loss.append(loss)
+
                     t += 1
 
             avg_batch_loss = sum(training_loss) / len(training_loss)
+            stats['train_loss'].append(avg_batch_loss)
             print(f'Average batch loss: {avg_batch_loss}')
 
             if epoch_i % self.target_update == 0:
@@ -287,12 +297,19 @@ class Agent:
                 self.epsilon -= 0.9/5 # anneal epsilon from 1 to 0.1 following the paper
 
             # validate
-            precision = self.validate()
+            precision, avg_reward, avg_IOU = self.validate()
             if precision[-1] > best_precision:
                 self.save_checkpoint("best", self.save_dir)
 
             print(f'precision: {precision}')
+            stats['precision'].append(precision)
+            stats['reward'].append(avg_reward)
+            stats['IOU'].append(avg_IOU)
+            print(stats)
             self.policy_net.train()
+        if self.stats_dir is not None:
+            with open(self.stats_dir) as f:
+                json.dump(stats, f)
 
     def train_policy_net(self):
         # Optimize the model using backprop
@@ -336,16 +353,24 @@ class Agent:
 
         return loss.item()
 
-    def _validate_find_box(self, image, get_actions=False):
+    def _validate_find_box(self, image, gt_boxes, get_actions=False):
         assert image.shape[0] == 1
-        image = image.squeeze(0).to(self.device)
+        image, gt_boxes = image.squeeze(0).to(self.device), gt_boxes.squeeze(0).to(self.device)
         self.actions_history = torch.ones((9, 9), device=self.device)
         original_image = image.clone()
         prev_state = self.get_state(image)  # bz x (81 + image feature size)
+        xmin = 0.0
+        xmax = self.width
+        ymin = 0.0
+        ymax = self.height
+        prev_box = [xmin, ymin, xmax, ymax]
         done = False
+
         all_actions = []  # track all previous action to update box
 
         t = 0
+        cum_reward = 0
+        cum_IOU = 0
         while not done and t < self.max_steps_per_episode:
             action = self.get_action_eval(prev_state)
             done = action == 8
@@ -360,13 +385,24 @@ class Agent:
                 # try:
                 cur_image = self.update_observed_region(original_image, cur_box)
                 next_state = self.get_state(cur_image)
+                IOU_cur, _ = self.find_closest_box(cur_box, gt_boxes)
+                cum_IOU += IOU_cur
+                reward = self.compute_reward(prev_box, cur_box, gt_boxes)
+                cum_reward += reward.item()
                 prev_state = next_state
+                prev_box = cur_box
+            else:
+                # compute the reward for termination
+                IOU, _ = self.find_closest_box(cur_box, gt_boxes)
+                cum_IOU += IOU
+                reward = self.eta if IOU >= self.threshold else -1 * self.eta
+                cum_reward += reward
             t += 1
 
         if get_actions:
             return cur_box, all_actions
         else:
-            return cur_box
+            return cur_box, cum_reward, cum_IOU
 
     def _eval(self, hyp, tgt):
         assert len(hyp) == len(tgt)
@@ -397,13 +433,17 @@ class Agent:
         hyp = []
         tgt = []
         # compute the precision and recall on validation set
+        reward = 0
+        IOU = 0
         for image, boxes in tqdm(self.valid_dataloader):
             with torch.no_grad():
-                box = self._validate_find_box(image)
+                box, batch_reward, batch_IOU = self._validate_find_box(image, boxes)
+                reward += batch_reward
+                IOU += batch_IOU
                 hyp.append(box)
                 tgt.append(boxes)
         precision = self._eval(hyp, tgt)
-        return precision
+        return precision, reward / len(self.valid_dataloader), IOU / len(self.valid_dataloader)
 
     def _save_gif(self, output_path, box_history, gt, image):
         GT_COLOR = (0, 128, 0) # Green
