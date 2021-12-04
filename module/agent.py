@@ -305,10 +305,10 @@ class Agent:
             stats['precision'].append(precision)
             stats['reward'].append(avg_reward)
             stats['IOU'].append(avg_IOU)
-            print(stats)
+            # print(stats)
             self.policy_net.train()
         if self.stats_dir is not None:
-            with open(self.stats_dir) as f:
+            with open(self.stats_dir, 'w') as f:
                 json.dump(stats, f)
 
     def train_policy_net(self):
@@ -439,7 +439,7 @@ class Agent:
             with torch.no_grad():
                 box, batch_reward, batch_IOU = self._validate_find_box(image, boxes)
                 reward += batch_reward
-                IOU += batch_IOU
+                IOU += batch_IOU.item()
                 hyp.append(box)
                 tgt.append(boxes)
         precision = self._eval(hyp, tgt)
