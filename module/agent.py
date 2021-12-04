@@ -40,6 +40,10 @@ class Agent:
 
         # Initializing models
         self.extractor = FeatureExtractor(kwargs['image_extractor'], freeze=True).to(self.device)
+        if kwargs['load_path_cnn'] is not None:
+            print('load pretrained cnn')
+            checkpoint = torch.load(kwargs['load_path_cnn'], map_location=self.device)
+            self.extractor.load_state_dict(checkpoint['extractor'])
         self.extractor.eval()  # do not update the pretrained CNN
 
         rl_algo = kwargs['rl_algo']
@@ -157,6 +161,8 @@ class Agent:
             elif action == 7:  # narrower
                 x_min += alpha_w
                 x_max -= alpha_w
+            alpha_h = self.alpha * (y_max - y_min)
+            alpha_w = self.alpha * (x_max - x_min)
 
         x_min = min(max(x_min, 0), self.width)
         x_max = min(max(x_max, 0), self.width)
