@@ -12,9 +12,7 @@ Create a new conda environment and download all the required packages using the 
 
 To use an existing conda environment and simply update its packages for this repo, run
 
-`conda activate <MYENV>`
-
-`conda env update --file environment.yml --prune`
+`conda env update -name <MYENV> --file environment.yml --prune`
 
 Please note that this package installs cudatoolkit version 11.1, which may not be compatible with your GPU drivers.
 

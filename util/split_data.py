@@ -4,7 +4,10 @@ import argparse
 import json
 import os
 
-from util.voc_dataset import VOCDataset
+try:
+    from util.voc_dataset import VOCDataset
+except ModuleNotFoundError:
+    from voc_dataset import VOCDataset
 
 
 OBJECT_LABEL = 'object'
