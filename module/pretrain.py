@@ -1,8 +1,8 @@
 import os
 import torch
-
 import matplotlib.pyplot as plt
-from module.models import DQN, FeatureExtractor
+
+from module.models import FeatureExtractor
 from tqdm import tqdm
 
 
@@ -59,7 +59,6 @@ class Trainer:
 
         # plt.plot(val_acc, label='val accuracy')
 
-
     def train(self):
         best_val = float('inf')
         train_loss_all = []
@@ -95,7 +94,6 @@ class Trainer:
             self.scheduler.step()
 
         self.plot_curve(train_loss_all, val_loss_all, val_acc_all)
-
 
     def validate(self):
         valid_batch_loss = []

@@ -27,7 +27,6 @@ class FeatureExtractor(nn.Module):
 			nn.Linear(4096, num_cls)
 		)
 
-
 		if freeze:
 			self.finetune = False
 			model.eval()  # to not do dropout
@@ -39,7 +38,6 @@ class FeatureExtractor(nn.Module):
 			self.finetune = True
 			model.train()
 
-
 	def forward(self, x):
 		if not self.finetune:
 			x = self.features(x)
@@ -49,6 +47,7 @@ class FeatureExtractor(nn.Module):
 			bz = x.size(0)
 			x = x.view(bz, -1)
 			return self.new_classifier(x)
+
 
 class DQN(nn.Module):
 	def __init__(self):

@@ -3,7 +3,7 @@ import torch
 import random
 import imageio
 
-from module.models import DQN, FeatureExtractor
+from module.models import DQN, FeatureExtractor, DuelingDQN
 from module.memory import ReplayMemory
 from torch.autograd import Variable
 from util.common import draw_box
@@ -41,7 +41,7 @@ class Agent:
         # Initializing models
         self.extractor = FeatureExtractor(kwargs['image_extractor'], freeze=True).to(self.device)
         if kwargs['load_path_cnn'] is not None:
-            print('load pretrained cnn')
+            print('Loading pretrained cnn')
             checkpoint = torch.load(kwargs['load_path_cnn'], map_location=self.device)
             self.extractor.load_state_dict(checkpoint['extractor'])
         self.extractor.eval()  # do not update the pretrained CNN
@@ -49,9 +49,10 @@ class Agent:
         rl_algo = kwargs['rl_algo']
         if rl_algo == 'DQN':
             self.policy_net = DQN().to(self.device)
-            self.target_net = DQN().to(self.device)  # DQN use two policy network
-        elif rl_algo == 'DoubleDQN':
-            raise ValueError('Not yet implemented')
+            self.target_net = DQN().to(self.device)
+        elif rl_algo == 'DuelingDQN':
+            self.policy_net = DuelingDQN().to(self.device)
+            self.target_net = DuelingDQN().to(self.device)
         else:
             raise ValueError('Please select a reinforcement learning model to use')
 
