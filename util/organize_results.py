@@ -26,5 +26,5 @@ def organize_resutls(dir):
 
 
 if __name__ == '__main__':
-    res_path = '/raid/home/slai16/ObjectDetectionRL/validation_lr_0_00001'
+    res_path = '/raid/home/slai16/ObjectDetectionRL/validation_lr_0_000001'
     organize_resutls(res_path)
