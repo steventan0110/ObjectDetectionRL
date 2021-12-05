@@ -33,17 +33,17 @@ python main.py \
   --rl_algo DQN \
   --cls ${CLS}
 
-#python main.py \
-#  --mode train \
-#  --batch_size 100 \
-#  --data_dir ${DATA}\
-#  --save_dir ${PRETRAINED_DQN_ROOT}/checkpoints/ \
-#  --stats_dir ${PRETRAINED_DQN_ROOT}/stats/${CLS}.json \
-#  --learning_rate 0.00001 \
-#  --load-path-cnn NONE \
-#  --epochs 25 \
-#  --rl_algo DQN \
-#  --cls ${CLS}
+python main.py \
+  --mode train \
+  --batch_size 100 \
+  --data_dir ${DATA}\
+  --save_dir ${PRETRAINED_DQN_ROOT}/checkpoints/ \
+  --stats_dir ${PRETRAINED_DQN_ROOT}/stats/${CLS}.json \
+  --learning_rate 0.00001 \
+  --load-path-cnn /raid/home/slai16/ObjectDetectionRL/checkpoint_vgg_best.pt \
+  --epochs 25 \
+  --rl_algo DQN \
+  --cls ${CLS}
 
 python main.py \
   --mode train \
