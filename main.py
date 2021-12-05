@@ -96,6 +96,8 @@ def parse_args():
                         help='Height to resize image to')
     parser.add_argument('--width', default=256, type=int,
                         help='Width to resize image to')
+    parser.add_argument('--epochs', default=25, type=int,
+                        help='Number of epochs to train for')
     args = parser.parse_args()
     return args
 

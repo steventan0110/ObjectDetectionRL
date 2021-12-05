@@ -13,5 +13,6 @@ python main.py \
   --save_dir ${ROOT}/checkpoints/ \
   --stats_dir ${ROOT}/stats/aeroplane.json \
   --learning_rate ${LR} \
+  --epochs 25 \
   --rl_algo DQN \
   --cls aeroplane
