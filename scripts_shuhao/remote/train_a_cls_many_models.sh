@@ -2,6 +2,7 @@
 
 # Trying aeroplane, person, car, chair
 CLS=$1
+LR=0.000001
 
 DATA=/raid/home/slai16/ObjectDetectionRL/dataset
 CLS_ROOT=/raid/home/slai16/ObjectDetectionRL/train_${CLS}_best_lr
@@ -28,7 +29,7 @@ python main.py \
   --data_dir ${DATA}\
   --save_dir ${DQN_ROOT}/checkpoints/ \
   --stats_dir ${DQN_ROOT}/stats/${CLS}.json \
-  --learning_rate 0.00001 \
+  --learning_rate ${LR} \
   --epochs 20 \
   --rl_algo DQN \
   --cls ${CLS}
@@ -39,7 +40,7 @@ python main.py \
   --data_dir ${DATA}\
   --save_dir ${PRETRAINED_DQN_ROOT}/checkpoints/ \
   --stats_dir ${PRETRAINED_DQN_ROOT}/stats/${CLS}.json \
-  --learning_rate 0.00001 \
+  --learning_rate ${LR} \
   --load-path-cnn /raid/home/slai16/ObjectDetectionRL/checkpoint_vgg_best.pt \
   --epochs 25 \
   --rl_algo DQN \
@@ -51,7 +52,7 @@ python main.py \
   --data_dir ${DATA}\
   --save_dir ${DUELING_DQN_ROOT}/checkpoints/ \
   --stats_dir ${DUELING_DQN_ROOT}/stats/${CLS}.json \
-  --learning_rate 0.00001 \
+  --learning_rate ${LR} \
   --epochs 20 \
   --rl_algo DuelingDQN \
   --cls ${CLS}
