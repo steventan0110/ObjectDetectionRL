@@ -1,44 +1,57 @@
 # Best LR found: 0.00001
 
+# Trying aeroplane, person, car, chair
 CLS=$1
 
 DATA=/raid/home/slai16/ObjectDetectionRL/dataset
-ROOT=/raid/home/slai16/ObjectDetectionRL/${CLS}
+CLS_ROOT=/raid/home/slai16/ObjectDetectionRL/train_${CLS}_best_lr
 
-for model in "DQN" "DQN" ""; do
-  echo "EVALUATING MODEL TRANSFER LEARNED FROM FAT LANDMARK $counter"
+DQN_ROOT=${CLS_ROOT}/dqn
+PRETRAINED_DQN_ROOT=${CLS_ROOT}/pretrained_dqn
+DUELING_DQN_ROOT=${CLS_ROOT}/dueling_dqn
 
-  FILES="$TASK_FOLDER/val_image_paths.txt $TASK_FOLDER/val_landmark_paths.txt"
-  PARAM_FILE="$PARAM_FOLDER/transfer_from_set_1_fat_$counter/dev/model-100000"
-  LOG_FOLDER="$VAL_LOGS/transfer_from_set_1_fat_$counter"
+mkdir -p ${DQN_ROOT}
+mkdir ${DQN_ROOT}/checkpoints
+mkdir ${DQN_ROOT}/stats
 
-#    echo "$PARAM_FILE"
-#    echo "$FILES"
-#    echo "$LOG_FOLDER"
+mkdir -p ${PRETRAINED_DQN_ROOT}
+mkdir ${PRETRAINED_DQN_ROOT}/checkpoints
+mkdir ${PRETRAINED_DQN_ROOT}/stats
 
-  python DQN.py \
-    --task eval  \
-    --gpu 0 \
-    --load $PARAM_FILE \
-    --files $FILES \
-    --logDir $LOG_FOLDER \
-    --saveGif \
-    --agents 1
-done
-
-
-
-mkdir ${ROOT}
-mkdir ${ROOT}/checkpoints
-mkdir ${ROOT}/stats
+mkdir -p ${DUELING_DQN_ROOT}
+mkdir ${DUELING_DQN_ROOT}/checkpoints
+mkdir ${DUELING_DQN_ROOT}/stats
 
 python main.py \
   --mode train \
   --batch_size 100 \
   --data_dir ${DATA}\
-  --save_dir ${ROOT}/checkpoints/ \
-  --stats_dir ${ROOT}/stats/aeroplane.json \
+  --save_dir ${DQN_ROOT}/checkpoints/ \
+  --stats_dir ${DQN_ROOT}/stats/${CLS}.json \
   --learning_rate 0.00001 \
-  --epochs 25 \
+  --epochs 20 \
   --rl_algo DQN \
+  --cls ${CLS}
+
+#python main.py \
+#  --mode train \
+#  --batch_size 100 \
+#  --data_dir ${DATA}\
+#  --save_dir ${PRETRAINED_DQN_ROOT}/checkpoints/ \
+#  --stats_dir ${PRETRAINED_DQN_ROOT}/stats/${CLS}.json \
+#  --learning_rate 0.00001 \
+#  --load-path-cnn NONE \
+#  --epochs 25 \
+#  --rl_algo DQN \
+#  --cls ${CLS}
+
+python main.py \
+  --mode train \
+  --batch_size 100 \
+  --data_dir ${DATA}\
+  --save_dir ${DUELING_DQN_ROOT}/checkpoints/ \
+  --stats_dir ${DUELING_DQN_ROOT}/stats/${CLS}.json \
+  --learning_rate 0.00001 \
+  --epochs 20 \
+  --rl_algo DuelingDQN \
   --cls ${CLS}

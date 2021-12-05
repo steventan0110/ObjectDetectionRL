@@ -1,0 +1,16 @@
+DATA=/raid/home/slai16/ObjectDetectionRL/dataset
+ROOT=/raid/home/slai16/ObjectDetectionRL/aeroplane_test
+mkdir -p ${ROOT}
+mkdir ${ROOT}/checkpoints
+mkdir ${ROOT}/stats
+
+python main.py \
+  --mode train \
+  --batch_size 100 \
+  --data_dir ${DATA}\
+  --save_dir ${ROOT}/checkpoints/ \
+  --stats_dir ${ROOT}/stats/aeroplane.json \
+  --learning_rate 0.00001 \
+  --epochs 2 \
+  --rl_algo DuelingDQN \
+  --cls aeroplane
