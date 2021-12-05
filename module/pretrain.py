@@ -41,7 +41,7 @@ class Trainer:
         plt.savefig(f'{self.save_dir}/loss-curve.png')
 
     def plot_curve(self):
-        x = [_ for _ in range(20)]
+        import numpy as np
         train_loss = [1.953, 1.3882, 1.1474, 1.03599, 0.90604, 0.6764, 0.613966, 0.5789, 0.5383, 0.51047, 0.4753,
                       0.47789, 0.464825,0.460503, 0.467663, 0.444439, 0.45601359, 0.459355, 0.4650490, 0.4553926]
         val_loss = [1.53853261, 1.26586,1.1259732,1.072498, 1.043067812919,0.92924988,0.93180048,0.8840809,0.9327643,
@@ -51,13 +51,22 @@ class Trainer:
                    0.729387847,0.733905,0.73910097,0.7377456,0.73797153,0.74700700,0.7370679,0.74045629,0.7433928,
                    0.74361870,0.73616444,0.738875084]
         plt.figure()
-        plt.plot(x, train_loss, label='train loss')
-        # plt.plot(x, val_loss, label='val loss')
+        plt.plot(train_loss, label='Train Loss')
+        plt.plot(val_loss, label='Val Loss')
+        plt.xticks(np.arange(1, 21, 2))
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss (Cross Entropy)')
         plt.legend()
-        plt.show()
-        # plt.savefig(f'{self.save_dir}/loss-curve.png')
+        # plt.show()
+        plt.savefig(f'{self.save_dir}/loss-curve.png')
 
-        # plt.plot(val_acc, label='val accuracy')
+        plt.figure()
+        plt.plot(val_acc, label='Val Accuracy')
+        plt.xticks(np.arange(1, 21, 2))
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.savefig(f'{self.save_dir}/acc-curve.png')
 
     def train(self):
         best_val = float('inf')
@@ -116,6 +125,8 @@ class Trainer:
         from util.voc_dataset import VOCDataset
         total = 0
         correct = 0
+        self.plot_curve()
+        raise Exception
         self.extractor.eval()
         for image, label in tqdm(self.test_dataloader):
             image, label = image.to(self.device), label.squeeze(1).to(self.device)
