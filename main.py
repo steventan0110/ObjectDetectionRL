@@ -59,7 +59,7 @@ def main(args):
                                       num_workers=4)
         agent = Agent(None, valid_dataloader, **vars(args))
         print(f"Started testing class {args.cls}")
-        agent.visualize()
+        agent.visualize(num_images=15)
 
 
 def parse_args():

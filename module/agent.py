@@ -453,7 +453,7 @@ class Agent:
             drawn_img = draw_box(image, box, PRED_COLOR)
             drawn_img = draw_box(drawn_img, gt, GT_COLOR)
             gif_images.append(drawn_img)
-        imageio.mimsave(output_path, gif_images)
+        imageio.mimsave(output_path, gif_images, fps=3)
 
     def _get_box_history(self, actions):
         box_history = []
@@ -477,7 +477,7 @@ class Agent:
                 break
             else:
                 with torch.no_grad():
-                    pred_box, actions = self._validate_find_box(image, get_actions=True)
+                    pred_box, actions = self._validate_find_box(image, boxes, get_actions=True)
 
                     image, boxes = image.squeeze(0).to(self.device), boxes.squeeze(0).to(self.device)
                     IOU, closest_gt = self.find_closest_box(pred_box, boxes)
