@@ -30,26 +30,30 @@ def get_lr_threshold_precision(inp):
     return out
 
 def main(args):
+    import numpy as np
     dir = args.stats_dir
     if args.mode == 'model':
         models = ['dqn', 'dueling_dqn', 'pretrained_dqn']
         # plot three models's validation result
         cls_folder = f'{dir}/train_{args.cls}_best_lr'
-        with open(f'{cls_folder}/dqn/stats/{args.cls}.json', 'r') as f1:
+        with open(f'{cls_folder}/dqn/{args.cls}.json', 'r') as f1:
             dqn_json = json.load(f1)
-        with open(f'{cls_folder}/dueling_dqn/stats/{args.cls}.json', 'r') as f2:
+        with open(f'{cls_folder}/dueling_dqn/{args.cls}.json', 'r') as f2:
             dueling_json = json.load(f2)
-        # with open(f'{cls_folder}/pretrained_dqn/stats/{args.cls}.json', 'r') as f3:
-        #     pretrain_json = json.load(f3)
+        with open(f'{cls_folder}/pretrained_dqn/{args.cls}.json', 'r') as f3:
+            pretrain_json = json.load(f3)
 
-        save_dir = f'{args.save_dir}/model_compare/'
+        save_dir = f'{args.save_dir}/model_compare/{args.cls}'
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
+        rang = len(dqn_json['train_loss'])
         # ---------------------------------- Train LOSS ------------------------------------------------#
         plt.figure()
         plt.plot(dqn_json['train_loss'], label='DQN Train Loss')
         plt.plot(dueling_json['train_loss'], label='Dueling DQN Train Loss')
+        plt.plot(pretrain_json['train_loss'][:rang], label='Pretrain DQN Train Loss')
         plt.xlabel('Epochs')
+        plt.xticks(np.arange(1, rang, 2))
         plt.ylabel('Loss (MSE)')
         plt.legend()
         # plt.show()
@@ -58,30 +62,36 @@ def main(args):
 
         dqn1, dqn2, dqn3, dqn4, dqn5 = get_threshold_precision(dqn_json['precision'])
         ddqn1, ddqn2, ddqn3, ddqn4, ddqn5 = get_threshold_precision(dueling_json['precision'])
+        pre1, pre2, pre3, pre4, pre5 = get_threshold_precision(pretrain_json['precision'])
         fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1,5, figsize=(16, 5))
         ax1.plot(dqn1, label='DQN (t=0.1)')
-        ax1.plot(ddqn1, label='Dueling DQN (threshold=0.1)')
+        ax1.plot(ddqn1, label='Dueling DQN (t=0.1)')
+        ax1.plot(pre1[:rang], label='Pretrain DQN (t=0.1)')
         ax1.set_xlabel('Epochs')
         ax1.set_ylabel('Precision')
         ax1.legend(loc="upper right")
 
         ax2.plot(dqn2, label='DQN (t=0.2)')
-        ax2.plot(ddqn2, label='Dueling DQN (threshold=0.2)')
+        ax2.plot(ddqn2, label='Dueling DQN (t=0.2)')
+        ax2.plot(pre2[:rang], label='Pretrain DQN (t=0.2)')
         ax2.set_xlabel('Epochs')
         ax2.legend(loc="upper right")
 
         ax3.plot(dqn3, label='DQN (t=0.3)')
-        ax3.plot(ddqn3, label='Dueling DQN (threshold=0.3)')
+        ax3.plot(ddqn3, label='Dueling DQN (t=0.3)')
+        ax3.plot(pre3[:rang], label='Pretrain DQN (t=0.3)')
         ax3.set_xlabel('Epochs')
         ax3.legend(loc="upper right")
 
         ax4.plot(dqn4, label='DQN (t=0.4)')
-        ax4.plot(ddqn4, label='Dueling DQN (threshold=0.4)')
+        ax4.plot(ddqn4, label='Dueling DQN (t=0.4)')
+        ax4.plot(pre4[:rang], label='Pretrain DQN (t=0.1)')
         ax4.set_xlabel('Epochs')
         ax4.legend(loc="upper right")
 
         ax5.plot(dqn5, label='DQN (t=0.5)')
-        ax5.plot(ddqn5, label='Dueling DQN (threshold=0.5)')
+        ax5.plot(ddqn5, label='Dueling DQN (t=0.5)')
+        ax5.plot(pre5[:rang], label='Pretrain DQN (t=0.5)')
         ax5.set_xlabel('Epochs')
         ax5.legend(loc="upper right")
         #plt.show()
@@ -91,7 +101,9 @@ def main(args):
         plt.figure()
         plt.plot(dqn_json['reward'], label='DQN Reward')
         plt.plot(dueling_json['reward'], label='Dueling DQN Reward')
+        plt.plot(pretrain_json['reward'][:rang], label='Pretrain DQN Reward')
         plt.xlabel('Epochs')
+        plt.xticks(np.arange(1, rang, 2))
         plt.ylabel('Reward')
         plt.legend()
         # plt.show()
@@ -101,7 +113,9 @@ def main(args):
         plt.figure()
         plt.plot(dqn_json['IOU'], label='DQN IOU')
         plt.plot(dueling_json['IOU'], label='Dueling DQN IOU')
+        plt.plot(pretrain_json['IOU'][:rang], label='Pretrain DQN IOU')
         plt.xlabel('Epochs')
+        plt.xticks(np.arange(1, rang, 2))
         plt.ylabel('IOU')
         plt.legend()
         # plt.show()
