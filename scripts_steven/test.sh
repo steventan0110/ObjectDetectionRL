@@ -1,7 +1,7 @@
 ROOT=/home/steven/Code/GITHUB/ObjectDetectionRL
 
 python ${ROOT}/main.py \
-  --mode test \
+  --mode visualize \
   --batch_size 10 \
   --load-path-cnn ${ROOT}/checkpoints/checkpoint_vgg_best.pt \
   --data_dir ${ROOT}/dataset \

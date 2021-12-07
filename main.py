@@ -46,9 +46,9 @@ def main(args):
         agent = Agent(train_dataloader, valid_dataloader, **vars(args))
         print(f"Start Training for class {cls}")
         agent.train()
-    elif args.mode == 'test':
+    elif args.mode == 'visualize':
         if args.load_path is None:
-            raise ValueError('Need to provide parameters for test mode')
+            raise ValueError('Need to provide parameters for eval mode')
 
         transform = [ctransforms.resize(H, W)]
         valid_folder = os.path.join(args.data_dir, 'val')
@@ -60,11 +60,29 @@ def main(args):
         agent = Agent(None, valid_dataloader, **vars(args))
         print(f"Started testing class {args.cls}")
         agent.visualize(num_images=15)
+    elif args.mode == 'test':
+        if args.load_path is None:
+            raise ValueError('Need to provide parameters for test mode')
+
+        transform = [ctransforms.resize(H, W)]
+        test_folder = os.path.join(args.data_dir, 'test')
+        test_dataset = VOCDataset(test_folder, args.cls, label_image_transform=transform)
+        test_dataloader = DataLoader(dataset=test_dataset,
+                                      batch_size=1,
+                                      shuffle=False,
+                                      num_workers=4)
+        agent = Agent(None, test_dataloader, **vars(args))
+
+        # Validate will use self.valid_dataloader, which is initialized to be test_dataloader
+        precision, avg_reward, avg_IOU = agent.validate()
+        print(f'CLS {args.cls}: precision {precision}, avg reward {avg_reward}, avg IOU {avg_IOU}')
+    else:
+        raise ValueError('Please select a valid mode to use')
 
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--mode', '-m', choices={'train', 'test', 'pretrain'},
+    parser.add_argument('--mode', '-m', choices={'train', 'visualize', 'test', 'pretrain'},
                         help='execution mode')
     parser.add_argument('--cls', default='aeroplane', choices=set(VOCDataset.get_classes()),
                         help='Class to use when training and testing')

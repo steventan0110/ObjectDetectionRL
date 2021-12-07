@@ -9,7 +9,7 @@ if [[ $MODEL == 0 ]]; then
   echo "Visualizing DQN model"
   python main.py \
     --cls ${CLS} \
-    --mode test \
+    --mode visualize \
     --data_dir ${DATA} \
     --rl_algo DQN \
     --load_path ${ROOT}/validation_lr_0_00001/train_${CLS}_best_lr/dqn/checkpoints/checkpoint_${CLS}_best.pt \
@@ -20,7 +20,7 @@ if [[ $MODEL == 1 ]]; then
   echo "Visualizing pretrained DQN model"
   python main.py \
     --cls ${CLS} \
-    --mode test \
+    --mode visualize \
     --data_dir ${DATA} \
     --rl_algo DQN \
     --load-path-cnn /raid/home/slai16/ObjectDetectionRL/checkpoint_vgg_best.pt \
@@ -32,7 +32,7 @@ if [[ $MODEL == 2 ]]; then
   echo "Visualizing Dueling DQN model"
   python main.py \
     --cls ${CLS} \
-    --mode test \
+    --mode visualize \
     --data_dir ${DATA} \
     --rl_algo DuelingDQN \
     --load_path ${ROOT}/validation_lr_0_00001/train_${CLS}_best_lr/dueling_dqn/checkpoints/checkpoint_${CLS}_best.pt \
