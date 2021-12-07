@@ -1,6 +1,6 @@
 # ObjectDetectionRL
-This repo contains the final project for our Reinforcement Learning course. The project contains object detection
-framework using a deep reinforcement learning agent. The core model is a DQN
+This repo contains the final project for our Reinforcement Learning course. The project contains an object detection
+framework using deep reinforcement learning agents. The core model is a DQN
 whose actions transform a bounding box until it tightly bounds the desired object.
 The code is inspired by this [work](https://github.com/rayansamy/Active-Object-Localization-Deep-Reinforcement-Learning).
 
@@ -25,8 +25,15 @@ in the util folder. Run the script as follows
 
 `bash prep_dataset.sh <FOLDER_TO_STORE_DATA>`
 
-## Training
+## Using the Package
 
-To train the agents, use the following command:
+To use to package for training or visualization, refer to the scripts in `scripts_shuhao/local`.
 
-`python main.py --mode train --data-dir <DATA_FOLDER> --save-dir <SAVE_FOLDER>`
+## Example outputs
+
+Here are some examples; note that the pretrained model seems to produce the best bounding boxes, so these examples are mainly
+from the pretrained DQN. 
+
+![Bird example 1](examples/bird1.gif "title-1") ![Bird example 2](examples/bird2.gif "title-2")
+
+![Bird example 3](examples/bird3.gif "title-1") ![plane example 1](examples/plane1.gif "title-2")
